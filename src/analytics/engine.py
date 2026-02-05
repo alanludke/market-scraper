@@ -76,7 +76,8 @@ class MarketAnalytics:
             os.path.join(project_root, "data", "bronze", "**", "*_full.jsonl"),
             # Old structure: *_products_scraper/data/bronze/**/*_full.jsonl
             os.path.join(project_root, "*_products_scraper", "data", "bronze", "**", "*_full.jsonl"),
-            os.path.join(project_root, "bad_*_products_scraper", "data", "bronze", "**", "*_full.jsonl"),
+            # Uncomment to include angeloni (known issues with some files):
+            # os.path.join(project_root, "bad_*_products_scraper", "data", "bronze", "**", "*_full.jsonl"),
         ]
 
         files = []
@@ -89,8 +90,11 @@ class MarketAnalytics:
                 fallback = pattern.replace("*_full.jsonl", "*.jsonl")
                 files.extend(glob.glob(fallback, recursive=True))
 
-        # Normalize to forward slashes (DuckDB preference)
-        return [f.replace(os.sep, "/") for f in files]
+        # Normalize to forward slashes and filter out broken paths
+        valid = [f.replace(os.sep, "/") for f in files if os.path.isfile(f)]
+        if len(valid) < len(files):
+            logger.warning(f"Skipped {len(files) - len(valid)} missing/broken files")
+        return valid
 
     def _init_silver_view(self):
         """Create the silver_products view that reads from all bronze JSONL files."""
