@@ -14,7 +14,6 @@ To add a new (non-VTEX) supermarket, subclass BaseScraper and implement:
 """
 
 import json
-import logging
 import time
 import requests
 from requests.adapters import HTTPAdapter
@@ -22,9 +21,10 @@ from urllib3.util.retry import Retry
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from loguru import logger
 
-
-logger = logging.getLogger("market_scraper")
+from src.observability.metrics import get_metrics_collector
+from src.observability.logging_config import setup_logging
 
 
 class BaseScraper:
@@ -39,6 +39,9 @@ class BaseScraper:
         self.run_timestamp = datetime.now()
         self.run_id = self.run_timestamp.strftime("%Y%m%d_%H%M%S")
         self.session = self._create_session()
+
+        # Setup logging with run context (reconfigure globally)
+        setup_logging(run_id=self.run_id, store=store_name, region="all", verbose=False)
 
     def _create_session(self) -> requests.Session:
         session = requests.Session()
@@ -67,17 +70,39 @@ class BaseScraper:
     def run(self, regions: list[str] | None = None, limit: Optional[int] = None):
         """Main entry point. Override if the scraper needs a different flow."""
         targets = regions or list(self.regions.keys())
-        logger.info(f"[{self.store_name}] Starting run for {len(targets)} regions")
+        metrics = get_metrics_collector()
 
-        product_ids = self.discover_products(limit)
-        logger.info(f"[{self.store_name}] Discovered {len(product_ids)} products")
+        # Start metrics tracking (single run for all regions)
+        metrics.start_run(self.run_id, self.store_name, region="all")
+        logger.info(f"[{self.store_name}] Starting run {self.run_id} for {len(targets)} regions")
 
-        for region_key in targets:
-            if region_key not in self.regions:
-                logger.warning(f"Region '{region_key}' not found in config, skipping")
-                continue
-            self.scrape_region(region_key, product_ids)
-            self.session.cookies.clear()
+        try:
+            product_ids = self.discover_products(limit)
+            logger.info(f"[{self.store_name}] Discovered {len(product_ids)} products")
+
+            for region_key in targets:
+                if region_key not in self.regions:
+                    logger.warning(f"Region '{region_key}' not found in config, skipping")
+                    continue
+                self.scrape_region(region_key, product_ids)
+                self.session.cookies.clear()
+
+            # Success: finish run with metrics
+            metrics.finish_run(
+                status="success",
+                products_discovered=len(product_ids),
+                products_scraped=len(product_ids) * len(targets)
+            )
+            logger.info(f"[{self.store_name}] Run {self.run_id} completed successfully")
+
+        except Exception as e:
+            # Failure: log and record error
+            logger.exception(f"[{self.store_name}] Run {self.run_id} failed")
+            metrics.finish_run(
+                status="failed",
+                error_message=str(e)
+            )
+            raise
 
     def get_output_path(self, region_key: str) -> Path:
         ts = self.run_timestamp

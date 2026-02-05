@@ -34,7 +34,7 @@ def setup_logging(run_id: str = None, store: str = None, region: str = None, ver
     logger.add(
         sys.stdout,
         level=console_level,
-        format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{extra[run_id]}</cyan> | {message}",
+        format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | {message}",
         colorize=True,
     )
 

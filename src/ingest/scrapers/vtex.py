@@ -15,14 +15,13 @@ import json
 import re
 import time
 import base64
-import logging
 import xml.etree.ElementTree as ET
 from typing import Optional
 from pathlib import Path
+from loguru import logger
 
 from .base import BaseScraper
-
-logger = logging.getLogger("market_scraper")
+from src.observability.metrics import get_metrics_collector
 
 
 class RegionResolver:
@@ -57,8 +56,8 @@ class RegionResolver:
                                 if s.get("id"):
                                     region_id = s["id"]
                                     break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to fetch region ID for CEP {postal_code}: {e}")
 
         if not region_id:
             logger.warning(f"No region ID found for CEP {postal_code}")
@@ -91,24 +90,46 @@ class VTEXScraper(BaseScraper):
 
     def run(self, regions: list[str] | None = None, limit: Optional[int] = None):
         targets = regions or list(self.regions.keys())
-        logger.info(f"[{self.store_name}] Starting run for {len(targets)} regions")
+        metrics = get_metrics_collector()
 
-        if self.global_discovery:
-            product_ids = self.discover_products(limit)
-            logger.info(f"[{self.store_name}] Discovered {len(product_ids)} products")
-            for region_key in targets:
-                if region_key not in self.regions:
-                    logger.warning(f"Region '{region_key}' not in config, skipping")
-                    continue
-                self._scrape_by_ids(region_key, product_ids)
-                self.session.cookies.clear()
-        else:
-            for region_key in targets:
-                if region_key not in self.regions:
-                    logger.warning(f"Region '{region_key}' not in config, skipping")
-                    continue
-                self._scrape_by_departments(region_key, limit)
-                self.session.cookies.clear()
+        # Start metrics tracking
+        metrics.start_run(self.run_id, self.store_name, region="all")
+        logger.info(f"[{self.store_name}] Starting run {self.run_id} for {len(targets)} regions")
+
+        try:
+            if self.global_discovery:
+                product_ids = self.discover_products(limit)
+                logger.info(f"[{self.store_name}] Discovered {len(product_ids)} products")
+                for region_key in targets:
+                    if region_key not in self.regions:
+                        logger.warning(f"Region '{region_key}' not in config, skipping")
+                        continue
+                    self._scrape_by_ids(region_key, product_ids)
+                    self.session.cookies.clear()
+
+                # Success
+                metrics.finish_run(
+                    status="success",
+                    products_discovered=len(product_ids),
+                    products_scraped=len(product_ids) * len(targets)
+                )
+            else:
+                for region_key in targets:
+                    if region_key not in self.regions:
+                        logger.warning(f"Region '{region_key}' not in config, skipping")
+                        continue
+                    self._scrape_by_departments(region_key, limit)
+                    self.session.cookies.clear()
+
+                # Success (per-region mode)
+                metrics.finish_run(status="success")
+
+            logger.info(f"[{self.store_name}] Run {self.run_id} completed successfully")
+
+        except Exception as e:
+            logger.exception(f"[{self.store_name}] Run {self.run_id} failed")
+            metrics.finish_run(status="failed", error_message=str(e))
+            raise
 
     # ── Discovery ───────────────────────────────────────────────
 
@@ -142,7 +163,8 @@ class VTEXScraper(BaseScraper):
                     f"(total: {len(discovered)})"
                 )
                 idx += 1
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Sitemap discovery ended at index {idx}: {e}")
                 break
 
         result = list(discovered)
@@ -192,7 +214,8 @@ class VTEXScraper(BaseScraper):
                     start += 50
                     if len(items) < 50:
                         break
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"Category discovery error for dept {dept_id} at offset {start}: {e}")
                     break
                 time.sleep(self.request_delay)
             logger.info(f"  dept {dept_id}: total unique IDs = {len(discovered)}")
@@ -244,9 +267,12 @@ class VTEXScraper(BaseScraper):
         final_file = base_path / f"{self.store_name}_{region_key}_full.jsonl"
         api_url = f"{self.base_url}/api/catalog_system/pub/products/search"
 
+        metrics = get_metrics_collector()
+
         for i in range(0, len(product_ids), self.batch_size):
             chunk = product_ids[i : i + self.batch_size]
             batch_file = batches_dir / f"batch_{i // self.batch_size:05d}.jsonl"
+            batch_number = i // self.batch_size
             fq = ",".join(f"productId:{pid}" for pid in chunk)
             params = {
                 "fq": fq,
@@ -255,14 +281,18 @@ class VTEXScraper(BaseScraper):
                 "sc": cfg["sc"],
             }
 
-            try:
-                resp = self.session.get(api_url, params=params, timeout=20)
-                if resp.status_code in [200, 206]:
-                    items = resp.json()
-                    if items:
-                        self.save_batch(items, batch_file, region_key)
-            except Exception as e:
-                logger.error(f"Batch error at offset {i}: {e}")
+            with metrics.track_batch(batch_number) as batch:
+                try:
+                    resp = self.session.get(api_url, params=params, timeout=20)
+                    batch.api_status_code = resp.status_code
+                    if resp.status_code in [200, 206]:
+                        items = resp.json()
+                        batch.products_count = len(items)
+                        if items:
+                            self.save_batch(items, batch_file, region_key)
+                except Exception as e:
+                    logger.error(f"Batch {batch_number} error at offset {i}: {e}")
+                    batch.success = False
 
             if i % 500 == 0 and i > 0:
                 logger.info(f"  progress: {i}/{len(product_ids)}")
@@ -289,7 +319,9 @@ class VTEXScraper(BaseScraper):
 
         dept_ids = self._get_department_ids()
         total_collected = 0
+        batch_counter = 0
         api_url = f"{self.base_url}/api/catalog_system/pub/products/search"
+        metrics = get_metrics_collector()
 
         for dept_id in dept_ids:
             if limit and total_collected >= limit:
@@ -310,30 +342,36 @@ class VTEXScraper(BaseScraper):
                     "O": "OrderByScoreDESC",
                 }
 
-                try:
-                    resp = self.session.get(api_url, params=params, timeout=20)
-                    if resp.status_code not in [200, 206]:
-                        break
-                    items = resp.json()
-                    if not items:
-                        break
+                with metrics.track_batch(batch_counter) as batch:
+                    try:
+                        resp = self.session.get(api_url, params=params, timeout=20)
+                        batch.api_status_code = resp.status_code
+                        if resp.status_code not in [200, 206]:
+                            batch.success = False
+                            break
+                        items = resp.json()
+                        batch.products_count = len(items)
+                        if not items:
+                            break
 
-                    batch_file = (
-                        batches_dir / f"dept_{dept_id}_batch_{start:05d}.jsonl"
-                    )
-                    self.save_batch(
-                        items,
-                        batch_file,
-                        region_key,
-                        extra_metadata={"dept_id": dept_id},
-                    )
-                    total_collected += len(items)
-                    start += 50
-                    if len(items) < 50:
+                        batch_file = (
+                            batches_dir / f"dept_{dept_id}_batch_{start:05d}.jsonl"
+                        )
+                        self.save_batch(
+                            items,
+                            batch_file,
+                            region_key,
+                            extra_metadata={"dept_id": dept_id},
+                        )
+                        total_collected += len(items)
+                        start += 50
+                        batch_counter += 1
+                        if len(items) < 50:
+                            break
+                    except Exception as e:
+                        logger.error(f"Error dept {dept_id} offset {start}: {e}")
+                        batch.success = False
                         break
-                except Exception as e:
-                    logger.error(f"Error dept {dept_id} offset {start}: {e}")
-                    break
 
                 time.sleep(self.request_delay)
 

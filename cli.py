@@ -17,22 +17,14 @@ Usage:
 """
 
 import argparse
-import logging
 import sys
 import yaml
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from loguru import logger
 
-from src.scrapers import SCRAPER_REGISTRY
-
-
-def setup_logging(verbose: bool = False):
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        datefmt="%H:%M:%S",
-        level=level,
-    )
+from src.ingest.scrapers import SCRAPER_REGISTRY
+from src.observability.logging_config import setup_logging
 
 
 def load_config() -> dict:
@@ -85,9 +77,9 @@ def cmd_scrape(args, config):
                 store_name = futures[future]
                 try:
                     future.result()
-                    logging.getLogger("market_scraper").info(f"[{store_name}] Done")
+                    logger.info(f"[{store_name}] Done")
                 except Exception as e:
-                    logging.getLogger("market_scraper").error(f"[{store_name}] Failed: {e}")
+                    logger.error(f"[{store_name}] Failed: {e}")
     else:
         for store_name in targets:
             scraper = get_scraper(store_name, stores[store_name])
@@ -184,7 +176,8 @@ if __name__ == "__main__":
         parser.print_help()
         sys.exit(0)
 
-    setup_logging(args.verbose)
+    # Setup Loguru logging (will be overridden per scraper run with run_id)
+    setup_logging(run_id="cli", store="cli", region="cli", verbose=args.verbose)
     config = load_config()
 
     commands = {
