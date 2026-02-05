@@ -1,0 +1,205 @@
+# ============================================================================
+# CONFIGURACAO DE SUPERMERCADOS
+# ============================================================================
+# Para adicionar um novo mercado VTEX: copie um bloco e ajuste os valores.
+# Para um mercado NAO-VTEX: crie o bloco, defina platform: "custom",
+# e implemente a subclasse correspondente em src/scrapers/.
+
+stores:
+
+  # --------------------------------------------------------------------------
+  # BISTEK - Discovery via sitemap, scrape por batch de product IDs
+  # --------------------------------------------------------------------------
+  bistek:
+    platform: vtex
+    base_url: "https://www.bistek.com.br"
+    cookie_domain: ".bistek.com.br"
+    discovery: sitemap
+    sitemap_pattern: "/sitemap/product-{n}.xml"
+    global_discovery: true
+    batch_size: 50
+    request_delay: 0.3
+    regions:
+      florianopolis_costeira:
+        cep: "88047-010"
+        sc: "1"
+        hub_id: "v2.1E10CE150EA319FED789DC6BE7C290F5"
+      criciuma_centro:
+        cep: "88802-000"
+        sc: "1"
+        hub_id: "v2.1ACA29C622CF7C99ED59045C6074B6C9"
+      lages_coral:
+        cep: "88523-000"
+        sc: "1"
+        hub_id: "v2.191BE3A849CD16A9CEFF2AB55E90E6D7"
+      blumenau_itoupava:
+        cep: "89052-050"
+        sc: "1"
+        hub_id: "v2.314053D5BCFB5A6D4C5EA7ED6DF3C455"
+      itajai_saojoao:
+        cep: "88304-101"
+        sc: "1"
+        hub_id: "v2.2FD273C409C15EF7E16637C23820F3AB"
+      saojose_belavista:
+        cep: "88110-798"
+        sc: "1"
+        hub_id: "v2.471E6D82FC2AF1E3546612023788DC31"
+      brusque_saoluiz:
+        cep: "88350-210"
+        sc: "1"
+        hub_id: "v2.B8B2CA3F13B9BBBEF48E30DF6FB1C5C3"
+      palhoca_passavinte:
+        cep: "88132-149"
+        sc: "1"
+        hub_id: "v2.03F2FCD02C257443A10705733B2AD7ED"
+      poa_guadix:
+        cep: "91770-010"
+        sc: "1"
+        hub_id: "v2.C59E7778E80DE611066F17ABDE1DDCCE"
+      poa_nilo:
+        cep: "90470-000"
+        sc: "1"
+        hub_id: "v2.5549A69410A3F0219D7BCDA860C9D267"
+      torres_centro:
+        cep: "95560-000"
+        sc: "1"
+        hub_id: "v2.BEDC77227E6E64A871B09C032812BAA7"
+      balneario_camboriu:
+        cep: "88330-110"
+        sc: "1"
+        hub_id: "v2.D55FE45FC956CF3452F53FF1829D38B9"
+      joinville_aventureiro:
+        cep: "89226-000"
+        sc: "1"
+        hub_id: "v2.D64E8C3CDDA81BB086AFE28286D484E6"
+
+  # --------------------------------------------------------------------------
+  # FORT ATACADISTA - Discovery via category tree, scrape por batch de IDs
+  # --------------------------------------------------------------------------
+  fort:
+    platform: vtex
+    base_url: "https://www.deliveryfort.com.br"
+    cookie_domain: ".deliveryfort.com.br"
+    discovery: category_tree
+    global_discovery: true
+    discovery_region: balneario_camboriu   # regiao de referencia para discovery
+    batch_size: 50
+    request_delay: 0.1
+    regions:
+      # Lojas independentes (sem hub manual)
+      balneario_camboriu:
+        cep: "88330-110"
+        sc: "6"
+        hub_id: null
+      itajai_saojoao:
+        cep: "88304-101"
+        sc: "4"
+        hub_id: null
+      # Cluster SC Geral (estoque compartilhado, precos distintos por SC)
+      blumenau_itoupava:
+        cep: "89052-050"
+        sc: "5"
+        hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
+      florianopolis_costeira:
+        cep: "88047-010"
+        sc: "2"
+        hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
+      palhoca_passavinte:
+        cep: "88132-149"
+        sc: "3"
+        hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
+      saojose_belavista:
+        cep: "88110-798"
+        sc: "3"
+        hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
+      porto_belo:
+        cep: "88210-000"
+        sc: "1"
+        hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
+
+  # --------------------------------------------------------------------------
+  # GIASSI - Discovery via category tree, scrape por departamento PER REGION
+  # --------------------------------------------------------------------------
+  giassi:
+    platform: vtex
+    base_url: "https://www.giassi.com.br"
+    cookie_domain: ".giassi.com.br"
+    discovery: category_tree
+    global_discovery: false    # itera departamentos por regiao (nao faz discovery global)
+    batch_size: 50
+    request_delay: 0.2
+    regions:
+      # Lojas sem hub manual (fallback automatico via API)
+      florianopolis_santa_monica:
+        cep: "88035-000"
+        sc: "1"
+        hub_id: null
+      joinville_america:
+        cep: "89204-000"
+        sc: "1"
+        hub_id: null
+      blumenau_victor_konder:
+        cep: "89012-000"
+        sc: "1"
+        hub_id: null
+      palhoca_pagani:
+        cep: "88132-000"
+        sc: "1"
+        hub_id: null
+      # Mapeadas manualmente
+      florianopolis_sacogrande:
+        cep: "88032-005"
+        sc: "1"
+        hub_id: "v2.7F2A3943DBF84750AACFC84F88A37547"
+      sao_jose_areias:
+        cep: "88113-600"
+        sc: "1"
+        hub_id: "v2.ABCBB60D0ACAFE91572B611D519E9FB8"
+      joinville_bucarein:
+        cep: "89202-310"
+        sc: "1"
+        hub_id: "v2.3F129C77C9E351893874B20DA972497D"
+      jaragua_centro:
+        cep: "89251-000"
+        sc: "1"
+        hub_id: "v2.F7650946A1CE616593F5473A688636B9"
+      # Cluster Tubarao
+      tubarao_oficinas:
+        cep: "88701-000"
+        sc: "1"
+        hub_id: "v2.B38B0AA3929BDF670A0DB9B723107C2E"
+      tubarao_vila_moema:
+        cep: "88705-001"
+        sc: "1"
+        hub_id: "v2.B38B0AA3929BDF670A0DB9B723107C2E"
+      # Cluster Criciuma / Icara
+      icara_centro:
+        cep: "88820-000"
+        sc: "1"
+        hub_id: "v2.05909B625571D35E8E2AB27B22D4BE56"
+      criciuma_santa_barbara:
+        cep: "88804-000"
+        sc: "1"
+        hub_id: "v2.05909B625571D35E8E2AB27B22D4BE56"
+      criciuma_centenario:
+        cep: "88801-001"
+        sc: "1"
+        hub_id: "v2.05909B625571D35E8E2AB27B22D4BE56"
+      # Cluster Ararangua
+      ararangua_centro:
+        cep: "88900-045"
+        sc: "1"
+        hub_id: "v2.7515F347D55C9E8D142E1F03D061CB4E"
+      ararangua_cidade_alta:
+        cep: "88901-026"
+        sc: "1"
+        hub_id: "v2.7515F347D55C9E8D142E1F03D061CB4E"
+      # Cluster Sul Geral
+      morro_da_fumaca:
+        cep: "88830-000"
+        sc: "1"
+        hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
+      sombrio_centro:
+        cep: "88960-000"
+        sc: "1"
+        hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"

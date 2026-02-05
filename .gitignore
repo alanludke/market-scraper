@@ -1,0 +1,38 @@
+# Data (large, stored in Azure Blob)
+data/
+
+# Legacy scraper directories (code superseded by src/, data is local-only)
+bistek_products_scraper/
+fort_products_scraper/
+giassi_products_scraper/
+bad_angeloni_products_scraper/
+
+# DuckDB
+*.duckdb
+*.duckdb.wal
+duckdb_tmp/
+
+# Reports (regeneratable)
+*.xlsx
+
+# Environment & secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

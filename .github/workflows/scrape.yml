@@ -1,0 +1,48 @@
+# Scheduled scraping workflow
+# Runs daily at 06:00 UTC (03:00 BRT)
+# Free tier: 2000 minutes/month on GitHub Actions
+
+name: Daily Scrape
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:  # allows manual trigger from GitHub UI
+
+env:
+  AZURE_ACCOUNT_NAME: ${{ secrets.AZURE_ACCOUNT_NAME }}
+  AZURE_ACCOUNT_KEY: ${{ secrets.AZURE_ACCOUNT_KEY }}
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    strategy:
+      matrix:
+        store: [bistek, fort, giassi]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt azure-storage-blob
+
+      - name: Scrape ${{ matrix.store }}
+        run: python cli.py scrape ${{ matrix.store }}
+
+      - name: Upload to Azure Blob
+        if: env.AZURE_ACCOUNT_NAME != ''
+        run: python cli.py upload ${{ matrix.store }}
+
+      - name: Upload artifacts (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bronze-${{ matrix.store }}-${{ github.run_number }}
+          path: data/bronze/supermarket=${{ matrix.store }}/
+          retention-days: 7
