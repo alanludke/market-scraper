@@ -1,11 +1,9 @@
 # Data (large, stored in Azure Blob)
 data/
+!data/archive/  # Archive is tracked (legacy reference data)
 
-# Legacy scraper directories (code superseded by src/, data is local-only)
-bistek_products_scraper/
-fort_products_scraper/
-giassi_products_scraper/
-bad_angeloni_products_scraper/
+# Legacy code and corrupted data (archived for reference)
+archive/
 
 # DuckDB
 *.duckdb

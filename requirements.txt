@@ -1,3 +1,4 @@
+# Core dependencies
 requests>=2.31.0
 urllib3>=2.0.0
 pyyaml>=6.0
@@ -6,5 +7,20 @@ pandas>=2.0.0
 xlsxwriter>=3.1.0
 streamlit>=1.30.0
 python-dotenv>=1.0.0
-# Optional: Azure Blob Storage
-# azure-storage-blob>=12.19.0
+azure-storage-blob>=12.19.0
+
+# Observability & Logging (Phase 1)
+loguru>=0.7.0
+
+# Data Quality (Phase 2)
+pydantic>=2.5.0
+great-expectations>=0.18.0
+
+# Transform (Phase 1)
+dbt-duckdb>=1.7.0
+pyarrow>=14.0.0
+
+# Testing (Phase 3)
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
