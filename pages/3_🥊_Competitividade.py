@@ -57,7 +57,7 @@ try:
     WITH product_stores AS (
         SELECT
             p.product_name,
-            p.ean,
+            p.eans,
             s.store_name,
             MIN(p.min_price) as price
         FROM dev_local.tru_product p
@@ -65,7 +65,7 @@ try:
         WHERE p.min_price > 0
             AND p.scraped_date >= CURRENT_DATE - INTERVAL '7' DAY
             {store_filter_sql}
-        GROUP BY p.product_name, p.ean, s.store_name
+        GROUP BY p.product_name, p.eans, s.store_name
     )
     SELECT
         product_name,
@@ -101,7 +101,7 @@ if not multi_store.empty:
     st.dataframe(
         multi_store.rename(columns={
             'product_name': 'Produto',
-            'ean': 'EAN',
+            'eans': 'EAN',
             'store_count': 'Lojas',
             'lowest_price': 'Menor Preço',
             'highest_price': 'Maior Preço',
@@ -128,7 +128,7 @@ with col1:
     WITH product_prices AS (
         SELECT
             p.product_name,
-            p.ean,
+            p.eans,
             s.store_name,
             MIN(p.min_price) as price
         FROM dev_local.tru_product p
@@ -136,7 +136,7 @@ with col1:
         WHERE p.min_price > 0
             AND p.scraped_date >= CURRENT_DATE - INTERVAL '7' DAY
             {store_filter_sql}
-        GROUP BY p.product_name, p.ean, s.store_name
+        GROUP BY p.product_name, p.eans, s.store_name
     ),
     cheapest_per_product AS (
         SELECT
@@ -152,7 +152,7 @@ with col1:
         COUNT(*) as times_cheapest,
         ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 1) as win_rate_pct
     FROM product_prices pp
-    JOIN cheapest_per_product cpp ON pp.product_name = cpp.product_name AND pp.ean = cpp.ean
+    JOIN cheapest_per_product cpp ON pp.product_name = cpp.product_name AND pp.eans = cpp.eans
     WHERE pp.price = cpp.min_price
     GROUP BY pp.store_name
     ORDER BY times_cheapest DESC
@@ -218,7 +218,7 @@ top_gaps = conn.execute(f"""
 WITH product_prices AS (
     SELECT
         p.product_name,
-        p.ean,
+        p.eans,
         s.store_name,
         MIN(p.min_price) as price
     FROM dev_local.tru_product p
@@ -226,7 +226,7 @@ WITH product_prices AS (
     WHERE p.min_price > 0
         AND p.scraped_date >= CURRENT_DATE - INTERVAL '7' DAY
         {store_filter_sql}
-    GROUP BY p.product_name, p.ean, s.store_name
+    GROUP BY p.product_name, p.eans, s.store_name
 ),
 price_ranges AS (
     SELECT
