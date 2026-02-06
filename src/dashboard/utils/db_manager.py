@@ -60,7 +60,7 @@ def get_duckdb_connection():
     st.stop()
 
 
-def _download_and_connect(db_path: Path, download_url: str) -> duckdb.Connection:
+def _download_and_connect(db_path: Path, download_url: str):
     """Download database from URL and connect."""
     import requests
 
@@ -94,7 +94,7 @@ def _download_and_connect(db_path: Path, download_url: str) -> duckdb.Connection
             st.stop()
 
 
-def get_database_info(conn: duckdb.Connection) -> dict:
+def get_database_info(conn) -> dict:
     """Get metadata about the database."""
     try:
         info = {}
