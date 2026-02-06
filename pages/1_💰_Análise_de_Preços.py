@@ -56,8 +56,18 @@ with col4:
 st.markdown("---")
 
 # Build filters
-store_filter = f"AND s.store_name IN ('{\"', '\".join(selected_stores)}')" if selected_stores else ""
-brand_filter = f"AND b.brand_name IN ('{\"', '\".join(selected_brands)}')" if selected_brands else ""
+if selected_stores:
+    stores_list = "', '".join(selected_stores)
+    store_filter = f"AND s.store_name IN ('{stores_list}')"
+else:
+    store_filter = ""
+
+if selected_brands:
+    brands_list = "', '".join(selected_brands)
+    brand_filter = f"AND b.brand_name IN ('{brands_list}')"
+else:
+    brand_filter = ""
+
 price_filter = f"AND p.min_price BETWEEN {price_range[0]} AND {price_range[1]}"
 date_filter = f"AND p.scraped_date >= CURRENT_DATE - INTERVAL {days_back} DAY"
 
