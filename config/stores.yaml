@@ -1,14 +1,14 @@
 # ============================================================================
-# CONFIGURACAO DE SUPERMERCADOS
+# SUPERMARKET CONFIGURATION
 # ============================================================================
-# Para adicionar um novo mercado VTEX: copie um bloco e ajuste os valores.
-# Para um mercado NAO-VTEX: crie o bloco, defina platform: "custom",
-# e implemente a subclasse correspondente em src/scrapers/.
+# To add a new VTEX store: copy a block and adjust the values.
+# For a NON-VTEX store: create the block, set platform: "custom",
+# and implement the corresponding subclass in src/scrapers/.
 
 stores:
 
   # --------------------------------------------------------------------------
-  # BISTEK - Discovery via sitemap, scrape por batch de product IDs
+  # BISTEK - Discovery via sitemap, scrape per batch of product IDs
   # --------------------------------------------------------------------------
   bistek:
     platform: vtex
@@ -74,7 +74,7 @@ stores:
         hub_id: "v2.D64E8C3CDDA81BB086AFE28286D484E6"
 
   # --------------------------------------------------------------------------
-  # FORT ATACADISTA - Discovery via category tree, scrape por batch de IDs
+  # FORT ATACADISTA - Discovery via category tree, scrape per batch of IDs
   # --------------------------------------------------------------------------
   fort:
     platform: vtex
@@ -82,11 +82,11 @@ stores:
     cookie_domain: ".deliveryfort.com.br"
     discovery: category_tree
     global_discovery: true
-    discovery_region: balneario_camboriu   # regiao de referencia para discovery
+    discovery_region: balneario_camboriu   # reference region for discovery
     batch_size: 50
     request_delay: 0.1
     regions:
-      # Lojas independentes (sem hub manual)
+      # Independent stores (no manual hub)
       balneario_camboriu:
         cep: "88330-110"
         sc: "6"
@@ -95,7 +95,7 @@ stores:
         cep: "88304-101"
         sc: "4"
         hub_id: null
-      # Cluster SC Geral (estoque compartilhado, precos distintos por SC)
+      # General SC Cluster (shared inventory, distinct prices per SC)
       blumenau_itoupava:
         cep: "89052-050"
         sc: "5"
@@ -118,18 +118,18 @@ stores:
         hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
 
   # --------------------------------------------------------------------------
-  # GIASSI - Discovery via category tree, scrape por departamento PER REGION
+  # GIASSI - Discovery via category tree, scrape per department PER REGION
   # --------------------------------------------------------------------------
   giassi:
     platform: vtex
     base_url: "https://www.giassi.com.br"
     cookie_domain: ".giassi.com.br"
     discovery: category_tree
-    global_discovery: false    # itera departamentos por regiao (nao faz discovery global)
+    global_discovery: false    # iterates departments per region (no global discovery)
     batch_size: 50
     request_delay: 0.2
     regions:
-      # Lojas sem hub manual (fallback automatico via API)
+      # Stores without manual hub (automatic fallback via API)
       florianopolis_santa_monica:
         cep: "88035-000"
         sc: "1"
@@ -146,7 +146,7 @@ stores:
         cep: "88132-000"
         sc: "1"
         hub_id: null
-      # Mapeadas manualmente
+      # Manually mapped
       florianopolis_sacogrande:
         cep: "88032-005"
         sc: "1"
@@ -163,7 +163,7 @@ stores:
         cep: "89251-000"
         sc: "1"
         hub_id: "v2.F7650946A1CE616593F5473A688636B9"
-      # Cluster Tubarao
+      # Tubarao Cluster
       tubarao_oficinas:
         cep: "88701-000"
         sc: "1"
@@ -172,7 +172,7 @@ stores:
         cep: "88705-001"
         sc: "1"
         hub_id: "v2.B38B0AA3929BDF670A0DB9B723107C2E"
-      # Cluster Criciuma / Icara
+      # Criciuma / Icara Cluster
       icara_centro:
         cep: "88820-000"
         sc: "1"
@@ -185,7 +185,7 @@ stores:
         cep: "88801-001"
         sc: "1"
         hub_id: "v2.05909B625571D35E8E2AB27B22D4BE56"
-      # Cluster Ararangua
+      # Ararangua Cluster
       ararangua_centro:
         cep: "88900-045"
         sc: "1"
@@ -194,7 +194,7 @@ stores:
         cep: "88901-026"
         sc: "1"
         hub_id: "v2.7515F347D55C9E8D142E1F03D061CB4E"
-      # Cluster Sul Geral
+      # General South Cluster
       morro_da_fumaca:
         cep: "88830-000"
         sc: "1"

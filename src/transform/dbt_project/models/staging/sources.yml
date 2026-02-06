@@ -49,7 +49,7 @@ sources:
             description: Injected metadata - store name (bistek)
 
           - name: _metadata_region
-            description: Injected metadata - region code (ex florianopolis_costeira)
+            description: Injected metadata - region code (e.g. florianopolis_costeira)
 
           - name: _metadata_run_id
             description: Scraper run identifier for traceability

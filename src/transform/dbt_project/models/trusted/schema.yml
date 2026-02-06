@@ -3,14 +3,14 @@ version: 2
 models:
   - name: tru_product
     description: >
-      Trusted model de produtos com lógica de negócio aplicada.
-      Deduplica scrapes diários por produto+região e extrai pricing de SKUs.
+      Trusted product model with business logic applied.
+      Deduplicates daily scrapes per product+region and extracts SKU pricing.
 
     config:
       contract:
         enforced: true
 
-      # Meta tags obrigatórias
+      # Required meta tags
       meta: &meta_tru_product
         graining: product_region_date
         contains_pii: false
@@ -22,13 +22,13 @@ models:
         load_frequency: daily
         main_kpis: min_price, avg_price, is_available, sku_count
 
-      # Propaga tags para Databricks
+      # Propagate tags to Databricks
       databricks_tags: *meta_tru_product
 
-    # Contract: Define schema explicitamente
+    # Contract: Explicitly define schema
     columns:
       # ─────────────────────────────────────────────────────────────
-      # Chave de negócio
+      # Business key
       # ─────────────────────────────────────────────────────────────
       - name: product_id
         description: Unique product identifier from VTEX API
@@ -56,7 +56,7 @@ models:
         data_type: varchar
 
       # ─────────────────────────────────────────────────────────────
-      # Localização
+      # Location
       # ─────────────────────────────────────────────────────────────
       - name: supermarket
         description: Store identifier (bistek, fort, giassi)
@@ -68,7 +68,7 @@ models:
               values: ['bistek', 'fort', 'giassi']
 
       - name: region
-        description: Geographic region code (ex florianopolis_costeira)
+        description: Geographic region code (e.g. florianopolis_costeira)
         data_type: varchar
         constraints:
           - type: not_null

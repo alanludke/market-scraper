@@ -3,17 +3,17 @@
     Layer: Trusted (Table with Contracts)
 
     Description:
-        Produtos deduplicated com lógica de negócio aplicada.
-        Mantém apenas o scrape mais recente por dia para cada produto+região.
-        Flattens nested items array para extrair SKUs, EANs e preços.
+        Deduplicated products with business logic applied.
+        Keeps only the most recent scrape per day for each product+region.
+        Flattens nested items array to extract SKUs, EANs and prices.
 
-    Grain: product_id + region + date (1 registro por produto/região/dia)
+    Grain: product_id + region + date (1 record per product/region/day)
 
     Business Logic:
-        - Deduplicação: Última scrape do dia por produto+região
-        - Limpeza: Remove produtos sem nome ou ID inválido
-        - Preço: Extrai menor preço disponível entre os SKUs
-        - EAN: Consolida EANs de todos os SKUs
+        - Deduplication: Latest scrape of the day per product+region
+        - Cleansing: Remove products without name or invalid ID
+        - Price: Extract lowest available price among SKUs
+        - EAN: Consolidate EANs from all SKUs
 
     Lineage: stg_vtex__products → tru_product
 #}
@@ -31,7 +31,7 @@ with
     )
 
     , deduplicated as (
-        {# Mantém apenas o scrape mais recente do dia por produto+região #}
+        {# Keep only the most recent scrape of the day per product+region #}
         select * from staging_products
         qualify row_number() over (
             partition by product_id, region, cast(scraped_at as date)
@@ -41,8 +41,8 @@ with
 
     , flattened_items as (
         {#
-            Flattens nested items array (SKUs) para extrair preços e EANs.
-            Cada produto pode ter múltiplos SKUs (ex: diferentes tamanhos).
+            Flattens nested items array (SKUs) to extract prices and EANs.
+            Each product can have multiple SKUs (e.g. different sizes).
         #}
         select
             product_id
@@ -81,7 +81,7 @@ with
             , item.name as sku_name
             , item.ean as ean
 
-            -- Extract pricing (primeiro seller disponível)
+            -- Extract pricing (first available seller)
             , item.sellers[1].commertialOffer.Price as price
             , item.sellers[1].commertialOffer.ListPrice as list_price
             , item.sellers[1].commertialOffer.AvailableQuantity as available_quantity
@@ -91,9 +91,9 @@ with
 
     , aggregate_product as (
         {#
-            Agregação final: 1 linha por produto+região+dia
-            - Menor preço entre os SKUs
-            - Lista de EANs consolidados
+            Final aggregation: 1 row per product+region+day
+            - Lowest price among SKUs
+            - List of consolidated EANs
         #}
         select
             product_id
@@ -130,13 +130,13 @@ with
 
     , add_audit_columns as (
         select
-            -- Chave de negócio
+            -- Business key
             product_id
             , product_name
             , brand
             , product_url
 
-            -- Localização
+            -- Location
             , supermarket
             , region
             , postal_code

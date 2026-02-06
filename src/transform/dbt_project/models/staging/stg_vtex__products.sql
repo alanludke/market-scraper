@@ -3,15 +3,15 @@
     Layer: Staging (Ephemeral)
 
     Description:
-        Unifica dados brutos de produtos dos 3 supermercados VTEX (Bistek, Fort, Giassi).
-        Aplica limpeza básica e padronização de colunas.
+        Unifies raw product data from 3 VTEX supermarkets (Bistek, Fort, Giassi).
+        Applies basic cleansing and column standardization.
 
-    Grain: product_id + region + run_id (raw, sem deduplicação)
+    Grain: product_id + region + run_id (raw, without deduplication)
 
     Notes:
-        - Ephemeral (não materializa tabela, apenas CTE para downstream models)
-        - Sem contracts (staging layer)
-        - Dados ainda contêm duplicatas (dedup acontece em trusted layer)
+        - Ephemeral (does not materialize table, only CTE for downstream models)
+        - No contracts (staging layer)
+        - Data still contains duplicates (dedup happens in trusted layer)
 #}
 
 with
@@ -21,7 +21,7 @@ with
             , productName as product_name
             , brand
             , link as product_url
-            , items  -- Mantém nested para processar em trusted
+            , items  -- Keep nested for processing in trusted
             , _metadata_supermarket as supermarket
             , _metadata_region as region
             , _metadata_postal_code as postal_code
@@ -29,7 +29,7 @@ with
             , _metadata_run_id as run_id
             , cast(_metadata_scraped_at as timestamp) as scraped_at
         from {{ source('bronze_bistek', 'products') }}
-        where productId is not null  -- Filtro básico de qualidade
+        where productId is not null  -- Basic quality filter
     )
 
     , fort_raw as (
