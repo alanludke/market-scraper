@@ -319,6 +319,208 @@ def bulk_import(csv_path, parquet_path, verbose):
 
 
 @cli.command()
+@click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
+def delta_sync(verbose):
+    """
+    Sync OpenFoodFacts delta updates (last 14 days of changes).
+
+    This command:
+    1. Fetches delta index from OpenFoodFacts
+    2. Downloads only new deltas (based on watermark timestamp)
+    3. Processes changes for EANs in VTEX data
+    4. Updates bronze layer incrementally
+
+    Delta files cover ~14 days of product updates.
+    Run this daily/weekly to keep data fresh.
+
+    Example:
+        python cli_enrich.py delta-sync
+    """
+    import requests
+    import gzip
+    import json
+    import duckdb
+    import pandas as pd
+    from pathlib import Path
+    from datetime import datetime as dt
+
+    run_id = f"openfoodfacts_delta_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    # Setup logging
+    setup_logging(
+        run_id=run_id,
+        store="openfoodfacts",
+        region="global",
+        verbose=verbose
+    )
+
+    logger.info(f"Starting delta sync (run_id={run_id})")
+    click.echo("OpenFoodFacts Delta Sync")
+    click.echo("="*50)
+
+    # Initialize pipeline and watermark
+    pipeline = EANEnrichmentPipeline()
+    watermark = EANWatermark()
+
+    # Step 1: Fetch delta index
+    click.echo("Step 1/5: Fetching delta index...")
+    try:
+        response = requests.get("https://static.openfoodfacts.org/data/delta/index.txt", timeout=10)
+        response.raise_for_status()
+        delta_files = response.text.strip().split('\n')
+        click.echo(f"  Found {len(delta_files)} delta files available")
+    except Exception as e:
+        click.echo(f"  Error fetching delta index: {e}")
+        logger.error(f"Delta index fetch failed: {e}")
+        return
+
+    # Step 2: Parse timestamps and filter new deltas
+    click.echo("Step 2/5: Checking for new deltas...")
+
+    # Load delta watermark (last processed timestamp)
+    delta_watermark_path = Path("data/metadata/delta_sync_watermark.json")
+    if delta_watermark_path.exists():
+        with open(delta_watermark_path, 'r') as f:
+            delta_data = json.load(f)
+            last_timestamp = delta_data.get('last_timestamp', 0)
+            click.echo(f"  Last sync: {dt.fromtimestamp(last_timestamp).strftime('%Y-%m-%d %H:%M:%S')}")
+    else:
+        last_timestamp = 0
+        click.echo(f"  No previous sync found (first run)")
+
+    # Parse delta filenames: openfoodfacts_products_[start]_[end].json.gz
+    new_deltas = []
+    for filename in delta_files:
+        parts = filename.replace('openfoodfacts_products_', '').replace('.json.gz', '').split('_')
+        if len(parts) == 2:
+            start_ts, end_ts = int(parts[0]), int(parts[1])
+            if end_ts > last_timestamp:
+                new_deltas.append((filename, start_ts, end_ts))
+
+    new_deltas.sort(key=lambda x: x[1])  # Sort by start timestamp
+
+    if not new_deltas:
+        click.echo(f"  No new deltas to process. Already up to date!")
+        return
+
+    click.echo(f"  Found {len(new_deltas)} new delta(s) to process")
+
+    # Step 3: Extract EANs from VTEX
+    click.echo("Step 3/5: Extracting EANs from tru_product...")
+    all_eans = pipeline.extract_unique_eans()
+    eans_set = set(all_eans)
+    click.echo(f"  Target: {len(all_eans):,} unique EANs")
+
+    # Step 4: Process each delta
+    click.echo(f"Step 4/5: Processing {len(new_deltas)} delta file(s)...")
+
+    total_products_updated = 0
+    latest_timestamp = last_timestamp
+
+    for filename, start_ts, end_ts in new_deltas:
+        delta_url = f"https://static.openfoodfacts.org/data/delta/{filename}"
+        click.echo(f"\n  Processing: {filename}")
+        click.echo(f"    Period: {dt.fromtimestamp(start_ts).strftime('%Y-%m-%d')} to {dt.fromtimestamp(end_ts).strftime('%Y-%m-%d')}")
+
+        try:
+            # Download delta file
+            response = requests.get(delta_url, timeout=30, stream=True)
+            response.raise_for_status()
+
+            # Decompress and parse JSON
+            with gzip.open(response.raw, 'rt', encoding='utf-8') as f:
+                products = []
+                line_count = 0
+
+                for line in f:
+                    line_count += 1
+                    try:
+                        product_data = json.loads(line)
+
+                        # Extract EAN code
+                        code = product_data.get('code')
+                        if not code or code not in eans_set:
+                            continue
+
+                        # Extract relevant fields (same as Parquet)
+                        product_name_arr = product_data.get('product_name')
+                        if isinstance(product_name_arr, list) and len(product_name_arr) > 0:
+                            product_name = product_name_arr[0].get('text') if isinstance(product_name_arr[0], dict) else None
+                        else:
+                            product_name = product_name_arr if isinstance(product_name_arr, str) else None
+
+                        nutriscore = product_data.get('nutriscore_grade')
+                        if nutriscore == 'unknown':
+                            nutriscore = None
+
+                        products.append({
+                            'code': code,
+                            'product_name': product_name,
+                            'brands': product_data.get('brands'),
+                            'nutriscore_grade': nutriscore
+                        })
+
+                    except json.JSONDecodeError:
+                        continue
+
+                click.echo(f"    Scanned {line_count:,} products, found {len(products)} matches")
+
+                # Save to bronze if we have updates
+                if products:
+                    from src.schemas.openfoodfacts import OpenFoodFactsProduct
+
+                    valid_products = []
+                    for prod in products:
+                        try:
+                            validated = OpenFoodFactsProduct.model_validate(prod)
+                            valid_products.append(validated.model_dump())
+                        except:
+                            pass
+
+                    if valid_products:
+                        output_path = pipeline.save_to_bronze(valid_products, f"{run_id}_{end_ts}")
+                        click.echo(f"    Saved {len(valid_products)} products to bronze")
+                        total_products_updated += len(valid_products)
+
+                # Update latest timestamp
+                latest_timestamp = max(latest_timestamp, end_ts)
+
+        except Exception as e:
+            click.echo(f"    Error processing delta: {e}")
+            logger.error(f"Delta processing failed: {e}")
+            continue
+
+    # Step 5: Update delta watermark
+    click.echo(f"\nStep 5/5: Updating delta watermark...")
+    delta_watermark_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(delta_watermark_path, 'w') as f:
+        json.dump({
+            'last_timestamp': latest_timestamp,
+            'last_sync_date': dt.fromtimestamp(latest_timestamp).isoformat(),
+            'run_id': run_id
+        }, f, indent=2)
+
+    click.echo(f"  Watermark updated: {dt.fromtimestamp(latest_timestamp).strftime('%Y-%m-%d %H:%M:%S')}")
+
+    # Display final statistics
+    click.echo("\n" + "="*50)
+    click.echo("DELTA SYNC STATISTICS")
+    click.echo("="*50)
+    click.echo(f"Deltas processed:        {len(new_deltas)}")
+    click.echo(f"Products updated:        {total_products_updated}")
+    click.echo(f"Latest timestamp:        {dt.fromtimestamp(latest_timestamp).strftime('%Y-%m-%d %H:%M:%S')}")
+    click.echo("="*50)
+
+    logger.info(f"Delta sync complete: {total_products_updated} products updated")
+
+    # Remind user to update DBT
+    if total_products_updated > 0:
+        click.echo("\nNext step: Update DBT models")
+        click.echo("  cd src/transform/dbt_project")
+        click.echo("  dbt run --select stg_openfoodfacts__products dim_ean")
+
+
+@cli.command()
 def stats():
     """Show current watermark statistics."""
     watermark = EANWatermark()
