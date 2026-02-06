@@ -1,0 +1,155 @@
+version: 2
+
+models:
+  - name: tru_product
+    description: >
+      Trusted model de produtos com lógica de negócio aplicada.
+      Deduplica scrapes diários por produto+região e extrai pricing de SKUs.
+
+    config:
+      contract:
+        enforced: true
+
+      # Meta tags obrigatórias (padrão Indicium)
+      meta: &meta_tru_product
+        graining: product_region_date
+        contains_pii: false
+        table_owner: Alan Ludke
+        area_owner: Data Engineering
+        email_owner: alan.ludke@indicium.tech
+        model_maturity: medium
+        access_type: public
+        load_frequency: daily
+        main_kpis: min_price, avg_price, is_available, sku_count
+
+      # Propaga tags para Databricks (padrão Indicium)
+      databricks_tags: *meta_tru_product
+
+    # Contract: Define schema explicitamente
+    columns:
+      # ─────────────────────────────────────────────────────────────
+      # Chave de negócio
+      # ─────────────────────────────────────────────────────────────
+      - name: product_id
+        description: Unique product identifier from VTEX API
+        data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - not_null
+          - unique:
+              config:
+                where: "scraped_date = current_date"  # Unique per day
+
+      - name: product_name
+        description: Product name as displayed in e-commerce
+        data_type: varchar
+        constraints:
+          - type: not_null
+
+      - name: brand
+        description: Product brand (nullable for generic products)
+        data_type: varchar
+
+      - name: product_url
+        description: Full URL to product page on store website
+        data_type: varchar
+
+      # ─────────────────────────────────────────────────────────────
+      # Localização
+      # ─────────────────────────────────────────────────────────────
+      - name: supermarket
+        description: Store identifier (bistek, fort, giassi)
+        data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - accepted_values:
+              values: ['bistek', 'fort', 'giassi']
+
+      - name: region
+        description: Geographic region code (ex florianopolis_costeira)
+        data_type: varchar
+        constraints:
+          - type: not_null
+
+      - name: postal_code
+        description: Brazilian postal code (CEP) for the region
+        data_type: varchar
+
+      - name: hub_id
+        description: VTEX seller/hub identifier for pricing
+        data_type: varchar
+
+      # ─────────────────────────────────────────────────────────────
+      # Pricing (Main KPIs)
+      # ─────────────────────────────────────────────────────────────
+      - name: min_price
+        description: >
+          Minimum price across all SKUs for this product.
+          Main KPI for price comparison.
+        data_type: double
+        tests:
+          - not_null
+
+      - name: max_price
+        description: Maximum price across all SKUs
+        data_type: double
+
+      - name: avg_price
+        description: Average price across all SKUs (KPI for price trends)
+        data_type: double
+
+      - name: min_list_price
+        description: Minimum list price (MSRP) for discount calculation
+        data_type: double
+
+      # ─────────────────────────────────────────────────────────────
+      # SKU Metrics
+      # ─────────────────────────────────────────────────────────────
+      - name: sku_count
+        description: Number of distinct SKUs/variants for this product
+        data_type: bigint
+        constraints:
+          - type: not_null
+
+      - name: eans
+        description: List of EAN barcodes for all SKUs (array)
+        data_type: varchar[]
+
+      - name: is_available
+        description: Boolean indicating if product is in stock
+        data_type: boolean
+        constraints:
+          - type: not_null
+
+      - name: total_available_quantity
+        description: Total quantity available across all SKUs
+        data_type: bigint
+
+      # ─────────────────────────────────────────────────────────────
+      # Audit Trail
+      # ─────────────────────────────────────────────────────────────
+      - name: run_id
+        description: Scraper execution identifier for traceability
+        data_type: varchar
+        constraints:
+          - type: not_null
+
+      - name: scraped_date
+        description: Date when data was scraped (partitioning key)
+        data_type: date
+        constraints:
+          - type: not_null
+
+      - name: scraped_at
+        description: Exact timestamp of latest scrape for this product
+        data_type: timestamp
+        constraints:
+          - type: not_null
+
+      - name: loaded_at
+        description: Timestamp when record was loaded into trusted layer
+        data_type: timestamp
+        constraints:
+          - type: not_null
