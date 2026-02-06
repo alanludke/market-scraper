@@ -264,14 +264,14 @@ class VTEXScraper(BaseScraper):
         base_path = self.get_output_path(region_key)
         batches_dir = base_path / "batches"
         batches_dir.mkdir(parents=True, exist_ok=True)
-        final_file = base_path / f"{self.store_name}_{region_key}_full.jsonl"
+        final_file = base_path / f"{self.store_name}_{region_key}_full.parquet"
         api_url = f"{self.base_url}/api/catalog_system/pub/products/search"
 
         metrics = get_metrics_collector()
 
         for i in range(0, len(product_ids), self.batch_size):
             chunk = product_ids[i : i + self.batch_size]
-            batch_file = batches_dir / f"batch_{i // self.batch_size:05d}.jsonl"
+            batch_file = batches_dir / f"batch_{i // self.batch_size:05d}.parquet"
             batch_number = i // self.batch_size
             fq = ",".join(f"productId:{pid}" for pid in chunk)
             params = {
@@ -315,7 +315,7 @@ class VTEXScraper(BaseScraper):
         base_path = self.get_output_path(region_key)
         batches_dir = base_path / "batches"
         batches_dir.mkdir(parents=True, exist_ok=True)
-        final_file = base_path / f"{self.store_name}_{region_key}_full.jsonl"
+        final_file = base_path / f"{self.store_name}_{region_key}_full.parquet"
 
         dept_ids = self._get_department_ids()
         total_collected = 0
@@ -355,7 +355,7 @@ class VTEXScraper(BaseScraper):
                             break
 
                         batch_file = (
-                            batches_dir / f"dept_{dept_id}_batch_{start:05d}.jsonl"
+                            batches_dir / f"dept_{dept_id}_batch_{start:05d}.parquet"
                         )
                         self.save_batch(
                             items,

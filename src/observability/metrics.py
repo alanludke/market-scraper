@@ -2,6 +2,8 @@
 Operational metrics collection using DuckDB.
 
 Tracks run-level and batch-level metrics for observability.
+
+Thread-safe for parallel scraping via global lock.
 """
 
 import duckdb
@@ -10,6 +12,10 @@ from pathlib import Path
 from contextlib import contextmanager
 from typing import Optional
 import time
+import threading
+
+# Global lock for DuckDB writes (prevents concurrent write errors in parallel mode)
+_db_lock = threading.Lock()
 
 
 class MetricsCollector:
@@ -33,57 +39,59 @@ class MetricsCollector:
         self.run_start_time: Optional[float] = None
 
     def _init_schema(self):
-        """Create tables if they don't exist."""
-        with duckdb.connect(str(self.db_path)) as conn:
-            # Runs table
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS scraper_runs (
-                    run_id VARCHAR PRIMARY KEY,
-                    store VARCHAR NOT NULL,
-                    region VARCHAR,
-                    started_at TIMESTAMP NOT NULL,
-                    finished_at TIMESTAMP,
-                    status VARCHAR NOT NULL,  -- 'running', 'success', 'failed', 'partial'
-                    products_discovered INTEGER,
-                    products_scraped INTEGER,
-                    bytes_downloaded BIGINT,
-                    api_calls_count INTEGER,
-                    api_errors_count INTEGER,
-                    duration_seconds DOUBLE,
-                    error_message TEXT,
-                    output_path VARCHAR
-                )
-            """)
+        """Create tables if they don't exist. Thread-safe via global lock."""
+        with _db_lock:
+            with duckdb.connect(str(self.db_path)) as conn:
+                # Runs table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS scraper_runs (
+                        run_id VARCHAR PRIMARY KEY,
+                        store VARCHAR NOT NULL,
+                        region VARCHAR,
+                        started_at TIMESTAMP NOT NULL,
+                        finished_at TIMESTAMP,
+                        status VARCHAR NOT NULL,  -- 'running', 'success', 'failed', 'partial'
+                        products_discovered INTEGER,
+                        products_scraped INTEGER,
+                        bytes_downloaded BIGINT,
+                        api_calls_count INTEGER,
+                        api_errors_count INTEGER,
+                        duration_seconds DOUBLE,
+                        error_message TEXT,
+                        output_path VARCHAR
+                    )
+                """)
 
-            # Batches table
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS scraper_batches (
-                    batch_id VARCHAR PRIMARY KEY,
-                    run_id VARCHAR NOT NULL,
-                    batch_number INTEGER,
-                    started_at TIMESTAMP,
-                    finished_at TIMESTAMP,
-                    products_count INTEGER,
-                    api_status_code INTEGER,
-                    response_time_ms DOUBLE,
-                    retry_count INTEGER,
-                    success BOOLEAN
-                )
-            """)
+                # Batches table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS scraper_batches (
+                        batch_id VARCHAR PRIMARY KEY,
+                        run_id VARCHAR NOT NULL,
+                        batch_number INTEGER,
+                        started_at TIMESTAMP,
+                        finished_at TIMESTAMP,
+                        products_count INTEGER,
+                        api_status_code INTEGER,
+                        response_time_ms DOUBLE,
+                        retry_count INTEGER,
+                        success BOOLEAN
+                    )
+                """)
 
     def start_run(self, run_id: str, store: str, region: str = None):
-        """Mark the start of a scraper run."""
+        """Mark the start of a scraper run. Thread-safe."""
         self.current_run_id = run_id
         self.current_store = store
         self.current_region = region
         self.run_start_time = time.time()
 
-        with duckdb.connect(str(self.db_path)) as conn:
-            conn.execute("""
-                INSERT INTO scraper_runs (
-                    run_id, store, region, started_at, status
-                ) VALUES (?, ?, ?, ?, 'running')
-            """, [run_id, store, region, datetime.now()])
+        with _db_lock:
+            with duckdb.connect(str(self.db_path)) as conn:
+                conn.execute("""
+                    INSERT INTO scraper_runs (
+                        run_id, store, region, started_at, status
+                    ) VALUES (?, ?, ?, ?, 'running')
+                """, [run_id, store, region, datetime.now()])
 
     def finish_run(
         self,
@@ -94,33 +102,34 @@ class MetricsCollector:
         error_message: str = None,
         **kwargs
     ):
-        """Mark the end of a scraper run with final metrics."""
+        """Mark the end of a scraper run with final metrics. Thread-safe."""
         if not self.current_run_id:
             raise ValueError("No active run. Call start_run() first.")
 
         duration = time.time() - self.run_start_time if self.run_start_time else None
 
-        with duckdb.connect(str(self.db_path)) as conn:
-            conn.execute("""
-                UPDATE scraper_runs
-                SET finished_at = ?,
-                    status = ?,
-                    products_discovered = ?,
-                    products_scraped = ?,
-                    duration_seconds = ?,
-                    output_path = ?,
-                    error_message = ?
-                WHERE run_id = ?
-            """, [
-                datetime.now(),
-                status,
-                products_discovered,
-                products_scraped,
-                duration,
-                output_path,
-                error_message,
-                self.current_run_id
-            ])
+        with _db_lock:
+            with duckdb.connect(str(self.db_path)) as conn:
+                conn.execute("""
+                    UPDATE scraper_runs
+                    SET finished_at = ?,
+                        status = ?,
+                        products_discovered = ?,
+                        products_scraped = ?,
+                        duration_seconds = ?,
+                        output_path = ?,
+                        error_message = ?
+                    WHERE run_id = ?
+                """, [
+                    datetime.now(),
+                    status,
+                    products_discovered,
+                    products_scraped,
+                    duration,
+                    output_path,
+                    error_message,
+                    self.current_run_id
+                ])
 
         # Reset context
         self.current_run_id = None
@@ -137,32 +146,35 @@ class MetricsCollector:
         retry_count: int = 0,
         success: bool = True
     ):
-        """Record batch-level metrics."""
+        """Record batch-level metrics. Thread-safe."""
         if not self.current_run_id:
             return  # Silently skip if no active run
 
-        batch_id = f"{self.current_run_id}_batch_{batch_number}"
+        # Use timestamp with microseconds to ensure unique batch_id in parallel execution
+        timestamp_us = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        batch_id = f"{self.current_run_id}_batch_{batch_number}_{timestamp_us}"
 
-        with duckdb.connect(str(self.db_path)) as conn:
-            conn.execute("""
-                INSERT INTO scraper_batches (
-                    batch_id, run_id, batch_number,
-                    started_at, finished_at,
-                    products_count, api_status_code,
-                    response_time_ms, retry_count, success
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, [
-                batch_id,
-                self.current_run_id,
-                batch_number,
-                datetime.now(),
-                datetime.now(),
-                products_count,
-                api_status_code,
-                response_time_ms,
-                retry_count,
-                success
-            ])
+        with _db_lock:
+            with duckdb.connect(str(self.db_path)) as conn:
+                conn.execute("""
+                    INSERT INTO scraper_batches (
+                        batch_id, run_id, batch_number,
+                        started_at, finished_at,
+                        products_count, api_status_code,
+                        response_time_ms, retry_count, success
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, [
+                    batch_id,
+                    self.current_run_id,
+                    batch_number,
+                    datetime.now(),
+                    datetime.now(),
+                    products_count,
+                    api_status_code,
+                    response_time_ms,
+                    retry_count,
+                    success
+                ])
 
     @contextmanager
     def track_batch(self, batch_number: int):
@@ -208,19 +220,20 @@ class MetricsCollector:
             )
 
     def get_run_stats(self, days: int = 7):
-        """Get run statistics for the last N days."""
-        with duckdb.connect(str(self.db_path)) as conn:
-            return conn.execute("""
-                SELECT
-                    store,
-                    COUNT(*) as total_runs,
-                    SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful_runs,
-                    AVG(duration_seconds) as avg_duration_seconds,
-                    SUM(products_scraped) as total_products
-                FROM scraper_runs
-                WHERE started_at > CURRENT_TIMESTAMP - INTERVAL ? DAY
-                GROUP BY store
-            """, [days]).fetchdf()
+        """Get run statistics for the last N days. Thread-safe."""
+        with _db_lock:
+            with duckdb.connect(str(self.db_path)) as conn:
+                return conn.execute("""
+                    SELECT
+                        store,
+                        COUNT(*) as total_runs,
+                        SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful_runs,
+                        AVG(duration_seconds) as avg_duration_seconds,
+                        SUM(products_scraped) as total_products
+                    FROM scraper_runs
+                    WHERE started_at > CURRENT_TIMESTAMP - INTERVAL ? DAY
+                    GROUP BY store
+                """, [days]).fetchdf()
 
 
 # Global instance (can be imported directly)
