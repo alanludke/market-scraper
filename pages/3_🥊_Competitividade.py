@@ -69,7 +69,7 @@ try:
     )
     SELECT
         product_name,
-        ean,
+        eans,
         COUNT(DISTINCT store_name) as store_count,
         MIN(price) as lowest_price,
         MAX(price) as highest_price,
@@ -77,7 +77,7 @@ try:
         ROUND(((MAX(price) - MIN(price)) / NULLIF(MIN(price), 0)) * 100, 1) as price_spread_pct,
         LIST(DISTINCT store_name) as stores
     FROM product_stores
-    GROUP BY product_name, ean
+    GROUP BY product_name, eans
     HAVING COUNT(DISTINCT store_name) >= {min_products}
     ORDER BY price_spread_pct DESC
     LIMIT 100
@@ -141,10 +141,10 @@ with col1:
     cheapest_per_product AS (
         SELECT
             product_name,
-            ean,
+            eans,
             MIN(price) as min_price
         FROM product_prices
-        GROUP BY product_name, ean
+        GROUP BY product_name, eans
         HAVING COUNT(DISTINCT store_name) >= {min_products}
     )
     SELECT
@@ -231,18 +231,18 @@ WITH product_prices AS (
 price_ranges AS (
     SELECT
         product_name,
-        ean,
+        eans,
         MIN(price) as min_price,
         MAX(price) as max_price,
         MAX(price) - MIN(price) as spread,
         COUNT(DISTINCT store_name) as store_count
     FROM product_prices
-    GROUP BY product_name, ean
+    GROUP BY product_name, eans
     HAVING COUNT(DISTINCT store_name) >= {min_products}
 )
 SELECT
     pr.product_name,
-    pr.ean,
+    pr.eans,
     pr.min_price,
     pr.max_price,
     ROUND(pr.spread, 2) as spread,
