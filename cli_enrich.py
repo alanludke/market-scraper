@@ -129,6 +129,196 @@ def eans(limit, full, verbose):
 
 
 @cli.command()
+@click.option('--csv', 'csv_path', type=click.Path(exists=True), help='Path to OpenFoodFacts CSV file')
+@click.option('--parquet', 'parquet_path', type=click.Path(exists=True), help='Path to OpenFoodFacts Parquet file')
+@click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
+def bulk_import(csv_path, parquet_path, verbose):
+    """
+    Import OpenFoodFacts data from bulk download (CSV or Parquet).
+
+    Download options:
+    - Parquet (recommended): https://huggingface.co/datasets/openfoodfacts/product-database
+    - CSV: https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz
+
+    This command:
+    1. Extracts EANs from tru_product (VTEX data)
+    2. Filters bulk file to only include those EANs (fast DuckDB query)
+    3. Validates and saves to bronze layer
+    4. Updates watermark
+
+    Examples:
+        # Parquet (faster, recommended)
+        python cli_enrich.py bulk-import --parquet data/external/openfoodfacts-food.parquet
+
+        # CSV
+        python cli_enrich.py bulk-import --csv data/external/en.openfoodfacts.org.products.csv.gz
+    """
+    import duckdb
+    import pandas as pd
+    from pathlib import Path
+
+    # Validate input
+    if not csv_path and not parquet_path:
+        click.echo("Error: Must provide either --csv or --parquet")
+        return
+    if csv_path and parquet_path:
+        click.echo("Error: Cannot use both --csv and --parquet")
+        return
+
+    input_path = csv_path or parquet_path
+    is_parquet = parquet_path is not None
+
+    run_id = f"openfoodfacts_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    # Setup logging
+    from src.observability.logging_config import setup_logging
+    setup_logging(
+        run_id=run_id,
+        store="openfoodfacts",
+        region="global",
+        verbose=verbose
+    )
+
+    logger.info(f"Starting bulk {'Parquet' if is_parquet else 'CSV'} import (run_id={run_id})")
+    click.echo(f"Input file: {input_path}")
+
+    # Initialize pipeline and watermark
+    pipeline = EANEnrichmentPipeline()
+    watermark = EANWatermark()
+
+    # Step 1: Extract unique EANs from tru_product
+    click.echo("Step 1/4: Extracting EANs from tru_product...")
+    all_eans = pipeline.extract_unique_eans()
+    click.echo(f"  Found {len(all_eans):,} unique EANs in VTEX data")
+
+    # Step 2: Filter file with DuckDB (memory efficient)
+    click.echo(f"Step 2/4: Filtering {'Parquet' if is_parquet else 'CSV'} for matching EANs (DuckDB)...")
+
+    # Create temp DuckDB connection
+    conn = duckdb.connect(':memory:')
+
+    # Register EANs as table
+    eans_df = pd.DataFrame({'ean': all_eans})
+    conn.register('target_eans', eans_df)
+
+    # Build query based on file format
+    if is_parquet:
+        # Parquet: Direct read with field extraction
+        # Note: product_name is array of {lang, text}, extract first text
+        query = f"""
+            SELECT
+                code,
+                CASE
+                    WHEN product_name IS NOT NULL AND len(product_name) > 0
+                    THEN product_name[1]['text']
+                    ELSE NULL
+                END as product_name,
+                brands,
+                CASE
+                    WHEN nutriscore_grade = 'unknown' THEN NULL
+                    WHEN nutriscore_grade IN ('a', 'b', 'c', 'd', 'e') THEN nutriscore_grade
+                    ELSE NULL
+                END as nutriscore_grade
+            FROM read_parquet('{input_path}')
+            WHERE code IN (SELECT ean FROM target_eans)
+                AND code IS NOT NULL
+                AND length(code) IN (8, 13, 14)
+        """
+    else:
+        # CSV: Tab-delimited with optional gzip
+        csv_path_obj = Path(input_path)
+        is_gzipped = csv_path_obj.suffix == '.gz'
+
+        query = f"""
+            SELECT
+                code,
+                product_name,
+                brands,
+                nutriscore_grade,
+                categories,
+                image_url
+            FROM read_csv(
+                '{input_path}',
+                delim='\t',
+                header=true,
+                all_varchar=true,
+                {'compression=''gzip''' if is_gzipped else ''}
+            )
+            WHERE code IN (SELECT ean FROM target_eans)
+                AND code IS NOT NULL
+                AND length(code) IN (8, 13, 14)
+        """
+
+    try:
+        df_filtered = conn.execute(query).fetchdf()
+        click.echo(f"  Found {len(df_filtered):,} matching products ({len(df_filtered)/len(all_eans)*100:.1f}% coverage)")
+    except Exception as e:
+        click.echo(f"  Error reading file: {e}")
+        logger.error(f"File parsing failed: {e}")
+        return
+    finally:
+        conn.close()
+
+    if len(df_filtered) == 0:
+        click.echo("  No matching products found in CSV. Nothing to import.")
+        return
+
+    # Step 3: Validate with Pydantic
+    click.echo("Step 3/4: Validating products with Pydantic...")
+    from src.schemas.openfoodfacts import OpenFoodFactsProduct
+
+    products = []
+    validation_errors = 0
+
+    with click.progressbar(df_filtered.iterrows(), length=len(df_filtered), label='Validating') as bar:
+        for _, row in bar:
+            try:
+                # Convert row to dict and validate
+                product_dict = {
+                    'code': row['code'],
+                    'product_name': row['product_name'] if pd.notna(row['product_name']) else None,
+                    'brands': row['brands'] if pd.notna(row['brands']) else None,
+                    'nutriscore_grade': row['nutriscore_grade'] if pd.notna(row['nutriscore_grade']) else None,
+                }
+
+                product = OpenFoodFactsProduct.model_validate(product_dict)
+                products.append(product.model_dump())
+            except Exception as e:
+                validation_errors += 1
+                if verbose:
+                    logger.warning(f"Validation error for EAN {row['code']}: {e}")
+
+    click.echo(f"  Valid products: {len(products):,}")
+    click.echo(f"  Validation errors: {validation_errors}")
+
+    # Step 4: Save to bronze layer
+    click.echo("Step 4/4: Saving to bronze layer...")
+    if products:
+        output_path = pipeline.save_to_bronze(products, run_id)
+        click.echo(f"  Saved {len(products):,} products to {output_path}")
+    else:
+        click.echo("  No valid products to save")
+        return
+
+    # Update watermark
+    watermark.save(all_eans)
+    click.echo(f"  Updated watermark: {len(all_eans):,} EANs tracked")
+
+    # Display final statistics
+    click.echo("\n" + "="*50)
+    click.echo("BULK IMPORT STATISTICS")
+    click.echo("="*50)
+    click.echo(f"Total EANs in VTEX:      {len(all_eans):,}")
+    click.echo(f"Products found in CSV:   {len(df_filtered):,}")
+    click.echo(f"Valid products saved:    {len(products):,}")
+    click.echo(f"Validation errors:       {validation_errors}")
+    click.echo(f"Coverage rate:           {len(products)/len(all_eans)*100:.1f}%")
+    click.echo("="*50)
+
+    logger.info(f"Bulk import complete: {len(products)} products imported")
+
+
+@cli.command()
 def stats():
     """Show current watermark statistics."""
     watermark = EANWatermark()
