@@ -52,35 +52,39 @@ else:
 # Multi-store products using tru_product directly (better query)
 st.subheader("📊 Produtos Disponíveis em Múltiplas Lojas")
 
-multi_store = conn.execute(f"""
-WITH product_stores AS (
+try:
+    multi_store = conn.execute(f"""
+    WITH product_stores AS (
+        SELECT
+            p.product_name,
+            p.ean,
+            s.store_name,
+            MIN(p.min_price) as price
+        FROM dev_local.tru_product p
+        JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
+        WHERE p.min_price > 0
+            AND p.scraped_date >= CURRENT_DATE - INTERVAL '7' DAY
+            {store_filter_sql}
+        GROUP BY p.product_name, p.ean, s.store_name
+    )
     SELECT
-        p.product_name,
-        p.ean,
-        s.store_name,
-        MIN(p.min_price) as price
-    FROM dev_local.tru_product p
-    JOIN dev_local.dim_store s ON p.supermarket = s.store_id
-    WHERE p.min_price > 0
-        AND p.scraped_date >= CURRENT_DATE - INTERVAL 7 DAY
-        {store_filter_sql}
-    GROUP BY p.product_name, p.ean, s.store_name
-)
-SELECT
-    product_name,
-    ean,
-    COUNT(DISTINCT store_name) as store_count,
-    MIN(price) as lowest_price,
-    MAX(price) as highest_price,
-    ROUND(MAX(price) - MIN(price), 2) as price_spread,
-    ROUND(((MAX(price) - MIN(price)) / NULLIF(MIN(price), 0)) * 100, 1) as price_spread_pct,
-    LIST(DISTINCT store_name) as stores
-FROM product_stores
-GROUP BY product_name, ean
-HAVING COUNT(DISTINCT store_name) >= {min_products}
-ORDER BY price_spread_pct DESC
-LIMIT 100
-""").df()
+        product_name,
+        ean,
+        COUNT(DISTINCT store_name) as store_count,
+        MIN(price) as lowest_price,
+        MAX(price) as highest_price,
+        ROUND(MAX(price) - MIN(price), 2) as price_spread,
+        ROUND(((MAX(price) - MIN(price)) / NULLIF(MIN(price), 0)) * 100, 1) as price_spread_pct,
+        LIST(DISTINCT store_name) as stores
+    FROM product_stores
+    GROUP BY product_name, ean
+    HAVING COUNT(DISTINCT store_name) >= {min_products}
+    ORDER BY price_spread_pct DESC
+    LIMIT 100
+    """).df()
+except Exception as e:
+    st.error(f"Erro ao buscar produtos multi-loja: {str(e)}")
+    multi_store = pd.DataFrame()
 
 if not multi_store.empty:
     # Format currency columns
@@ -128,9 +132,9 @@ with col1:
             s.store_name,
             MIN(p.min_price) as price
         FROM dev_local.tru_product p
-        JOIN dev_local.dim_store s ON p.supermarket = s.store_id
+        JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
         WHERE p.min_price > 0
-            AND p.scraped_date >= CURRENT_DATE - INTERVAL 7 DAY
+            AND p.scraped_date >= CURRENT_DATE - INTERVAL '7' DAY
             {store_filter_sql}
         GROUP BY p.product_name, p.ean, s.store_name
     ),
@@ -180,9 +184,9 @@ with col2:
         ROUND(AVG(p.min_price), 2) as avg_price,
         COUNT(DISTINCT p.product_id) as product_count
     FROM dev_local.tru_product p
-    JOIN dev_local.dim_store s ON p.supermarket = s.store_id
+    JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
     WHERE p.min_price > 0
-        AND p.scraped_date >= CURRENT_DATE - INTERVAL 7 DAY
+        AND p.scraped_date >= CURRENT_DATE - INTERVAL '7' DAY
         {store_filter_sql}
     GROUP BY s.store_name
     ORDER BY avg_price ASC
@@ -218,9 +222,9 @@ WITH product_prices AS (
         s.store_name,
         MIN(p.min_price) as price
     FROM dev_local.tru_product p
-    JOIN dev_local.dim_store s ON p.supermarket = s.store_id
+    JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
     WHERE p.min_price > 0
-        AND p.scraped_date >= CURRENT_DATE - INTERVAL 7 DAY
+        AND p.scraped_date >= CURRENT_DATE - INTERVAL '7' DAY
         {store_filter_sql}
     GROUP BY p.product_name, p.ean, s.store_name
 ),

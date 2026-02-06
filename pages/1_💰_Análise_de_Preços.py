@@ -69,7 +69,7 @@ else:
     brand_filter = ""
 
 price_filter = f"AND p.min_price BETWEEN {price_range[0]} AND {price_range[1]}"
-date_filter = f"AND p.scraped_date >= CURRENT_DATE - INTERVAL {days_back} DAY"
+date_filter = f"AND p.scraped_date >= CURRENT_DATE - INTERVAL '{days_back}' DAY"
 
 # KPI Cards
 st.subheader("📊 Indicadores-Chave de Preços (KPIs)")
@@ -80,7 +80,7 @@ kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 result = conn.execute(f"""
 SELECT ROUND(AVG(p.min_price), 2) as avg_price
 FROM dev_local.tru_product p
-JOIN dev_local.dim_store s ON p.supermarket = s.store_id
+JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
 LEFT JOIN dev_local.dim_brand b ON p.brand = b.brand_name
 WHERE p.min_price > 0 {date_filter} {store_filter} {brand_filter} {price_filter}
 """).fetchone()
@@ -90,7 +90,7 @@ avg_price = result[0] if result and result[0] is not None else 0
 result = conn.execute(f"""
 SELECT ROUND(STDDEV(p.min_price), 2) as volatility
 FROM dev_local.tru_product p
-JOIN dev_local.dim_store s ON p.supermarket = s.store_id
+JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
 LEFT JOIN dev_local.dim_brand b ON p.brand = b.brand_name
 WHERE p.min_price > 0 {date_filter} {store_filter} {brand_filter} {price_filter}
 """).fetchone()
@@ -100,7 +100,7 @@ volatility = result[0] if result and result[0] is not None else 0
 result = conn.execute(f"""
 SELECT COUNT(DISTINCT p.product_id) as count
 FROM dev_local.tru_product p
-JOIN dev_local.dim_store s ON p.supermarket = s.store_id
+JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
 LEFT JOIN dev_local.dim_brand b ON p.brand = b.brand_name
 WHERE p.min_price > 0 {date_filter} {store_filter} {brand_filter} {price_filter}
 """).fetchone()
@@ -116,7 +116,7 @@ WITH recent_prices AS (
         p.min_price,
         LAG(p.min_price) OVER (PARTITION BY p.product_id, p.supermarket ORDER BY p.scraped_date) as prev_price
     FROM dev_local.tru_product p
-    JOIN dev_local.dim_store s ON p.supermarket = s.store_id
+    JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
     LEFT JOIN dev_local.dim_brand b ON p.brand = b.brand_name
     WHERE p.min_price > 0 {date_filter} {store_filter} {brand_filter} {price_filter}
 )
@@ -150,7 +150,7 @@ SELECT
     ROUND(AVG(p.min_price), 2) as avg_price,
     COUNT(DISTINCT p.product_id) as product_count
 FROM dev_local.tru_product p
-JOIN dev_local.dim_store s ON p.supermarket = s.store_id
+JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
 LEFT JOIN dev_local.dim_brand b ON p.brand = b.brand_name
 WHERE p.min_price > 0 {date_filter} {store_filter} {brand_filter} {price_filter}
 GROUP BY p.scraped_date, s.store_name
@@ -187,7 +187,7 @@ with col1:
         s.store_name,
         p.min_price
     FROM dev_local.tru_product p
-    JOIN dev_local.dim_store s ON p.supermarket = s.store_id
+    JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
     LEFT JOIN dev_local.dim_brand b ON p.brand = b.brand_name
     WHERE p.min_price > 0 {date_filter} {store_filter} {brand_filter} {price_filter}
     """).df()
@@ -216,7 +216,7 @@ with col2:
             s.store_name,
             AVG(p.min_price) as avg_price
         FROM dev_local.tru_product p
-        JOIN dev_local.dim_store s ON p.supermarket = s.store_id
+        JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
         LEFT JOIN dev_local.dim_brand b ON p.brand = b.brand_name
         WHERE p.min_price > 0 {date_filter} {store_filter} {brand_filter} {price_filter}
         GROUP BY s.store_name
@@ -271,7 +271,7 @@ with tab1:
         ROUND(p.min_price, 2) as price,
         b.brand_name
     FROM dev_local.tru_product p
-    JOIN dev_local.dim_store s ON p.supermarket = s.store_id
+    JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
     LEFT JOIN dev_local.dim_brand b ON p.brand = b.brand_name
     WHERE p.min_price > 0 {date_filter} {store_filter} {brand_filter} {price_filter}
     ORDER BY p.min_price ASC
@@ -296,7 +296,7 @@ with tab2:
     WITH price_stats AS (
         SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY min_price) as median_price
         FROM dev_local.tru_product p
-        JOIN dev_local.dim_store s ON p.supermarket = s.store_id
+        JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
         LEFT JOIN dev_local.dim_brand b ON p.brand = b.brand_name
         WHERE p.min_price > 0 {date_filter} {store_filter} {brand_filter} {price_filter}
     )
@@ -307,7 +307,7 @@ with tab2:
         b.brand_name,
         ROUND(ABS(p.min_price - ps.median_price), 2) as distance_from_median
     FROM dev_local.tru_product p
-    JOIN dev_local.dim_store s ON p.supermarket = s.store_id
+    JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
     LEFT JOIN dev_local.dim_brand b ON p.brand = b.brand_name
     CROSS JOIN price_stats ps
     WHERE p.min_price > 0 {date_filter} {store_filter} {brand_filter} {price_filter}
@@ -335,7 +335,7 @@ with tab3:
         ROUND(p.min_price, 2) as price,
         b.brand_name
     FROM dev_local.tru_product p
-    JOIN dev_local.dim_store s ON p.supermarket = s.store_id
+    JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
     LEFT JOIN dev_local.dim_brand b ON p.brand = b.brand_name
     WHERE p.min_price > 0 {date_filter} {store_filter} {brand_filter} {price_filter}
     ORDER BY p.min_price DESC
