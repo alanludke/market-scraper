@@ -31,15 +31,18 @@ models:
       # Business key
       # ─────────────────────────────────────────────────────────────
       - name: product_id
-        description: Unique product identifier from VTEX API
+        description: Unique product identifier from VTEX API (unique per store+region)
         data_type: varchar
         constraints:
           - type: not_null
         tests:
           - not_null
-          - unique:
-              config:
-                where: "scraped_date = current_date"  # Unique per day
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns:
+                - product_id
+                - supermarket
+                - region
+                - scraped_date
 
       - name: product_name
         description: Product name as displayed in e-commerce
@@ -65,7 +68,8 @@ models:
           - type: not_null
         tests:
           - accepted_values:
-              values: ['bistek', 'fort', 'giassi']
+              arguments:
+                values: ['bistek', 'fort', 'giassi']
 
       - name: region
         description: Geographic region code (e.g. florianopolis_costeira)

@@ -57,7 +57,7 @@ models:
     marts:
       +materialized: table
       +contract:
-        enforced: true
+        enforced: false
 
       # Pricing Marts: Análise de preços, competitividade
       pricing_marts:

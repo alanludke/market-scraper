@@ -39,6 +39,21 @@ class VTEXImage(BaseModel):
         return v
 
 
+class VTEXPromotion(BaseModel):
+    """Promotion/discount applied to product."""
+    name: Optional[str] = None
+    promotionId: Optional[str] = None
+    discountValue: Optional[float] = Field(None, ge=0, description="Discount amount")
+    discountPercentage: Optional[float] = Field(None, ge=0, le=100, description="Discount percentage (0-100)")
+    promotionType: Optional[str] = None  # e.g., "percentage", "absolute", "freeShipping"
+    startDate: Optional[str] = None
+    endDate: Optional[str] = None
+    conditions: Optional[Dict[str, Any]] = None
+
+    class Config:
+        extra = "allow"
+
+
 class VTEXOffer(BaseModel):
     """Commercial offer from a seller."""
     Price: float = Field(gt=0, description="Current price (must be > 0)")
@@ -49,6 +64,13 @@ class VTEXOffer(BaseModel):
     AvailableQuantity: int = Field(ge=0, description="Stock quantity")
     Tax: Optional[float] = Field(None, ge=0)
     CacheVersionUsedToCallCheckout: Optional[str] = None
+
+    # NEW: Promotions applied to this offer
+    Promotions: Optional[List[VTEXPromotion]] = Field(default_factory=list)
+
+    # NEW: Delivery and availability metadata
+    DeliverySlaSameDayEnabled: Optional[bool] = None
+    EstimatedDateArrival: Optional[str] = None
 
     @model_validator(mode='after')
     def validate_offer(self):
@@ -157,6 +179,10 @@ class VTEXProduct(BaseModel):
 
     Validates products fetched from VTEX API (/api/catalog_system/pub/products/search).
     Ensures data quality before persisting to bronze layer.
+
+    NEW FIELDS (Phase 2):
+    - Specifications: Detailed product attributes (size, color, weight, etc.)
+    - isVariantOf: Parent product ID for variant deduplication
     """
     productId: str
     productName: str
@@ -179,6 +205,14 @@ class VTEXProduct(BaseModel):
     items: List[VTEXItem]
     allSpecifications: Optional[List[str]] = Field(default_factory=list)
     allSpecificationsGroups: Optional[List[str]] = Field(default_factory=list)
+
+    # NEW: Detailed specifications (key-value pairs)
+    # Example: {"Tamanho": ["500g"], "Sabor": ["Chocolate"], "Peso Aproximado": ["500g"]}
+    # Note: VTEX API may return specifications as dynamic fields (productClusters_*, etc.)
+    # These are captured via extra="allow" and processed in scrapers
+
+    # NEW: Variant grouping (if product is a variant of another product)
+    isVariantOf: Optional[str] = Field(None, description="Parent product ID for variants")
 
     @field_validator('productId')
     @classmethod

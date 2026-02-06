@@ -1,0 +1,153 @@
+version: 2
+
+models:
+  - name: fct_daily_prices
+    description: >
+      Main fact table for daily price snapshots with full dimensional modeling.
+      Uses surrogate keys to all conformed dimensions (Kimball star schema).
+
+    config:
+      tags: ['fact', 'pricing']
+
+    meta:
+      graining: product_key + store_key + region_key + date_key
+      contains_pii: false
+      table_owner: Data Engineering
+      model_maturity: production
+
+    columns:
+      # Surrogate Keys (Foreign Keys to Dimensions)
+      - name: product_key
+        description: Surrogate key to dim_product
+        data_type: bigint
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_product')
+              field: product_key
+
+      - name: store_key
+        description: Surrogate key to dim_store
+        data_type: bigint
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_store')
+              field: store_key
+
+      - name: region_key
+        description: Surrogate key to dim_region
+        data_type: bigint
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_region')
+              field: region_key
+
+      - name: date_key
+        description: Surrogate key to dim_date
+        data_type: integer
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+
+      - name: brand_key
+        description: Surrogate key to dim_brand (nullable)
+        data_type: bigint
+        tests:
+          - relationships:
+              to: ref('dim_brand')
+              field: brand_key
+
+      - name: ean_key
+        description: Surrogate key to dim_ean (nullable - some products lack EANs)
+        data_type: bigint
+        tests:
+          - relationships:
+              to: ref('dim_ean')
+              field: ean_key
+
+      # Measures
+      - name: min_price
+        description: Minimum price across all SKUs for this product
+        data_type: double
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100000
+
+      - name: avg_price
+        description: Average price across all SKUs
+        data_type: double
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100000
+
+      - name: discount_pct
+        description: Discount percentage (vs list price)
+        data_type: double
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -100
+                max_value: 100
+
+  - name: fct_price_comparison_v2
+    description: >
+      Price comparison fact table for products available in multiple stores.
+      Includes price ranking and competitive metrics.
+
+    config:
+      tags: ['fact', 'pricing', 'comparison']
+
+    meta:
+      graining: product_key + store_key + date_key (only multi-store products)
+      contains_pii: false
+      table_owner: Data Engineering
+
+    columns:
+      - name: product_key
+        description: Surrogate key to dim_product
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_product')
+              field: product_key
+
+      - name: store_key
+        description: Surrogate key to dim_store
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_store')
+              field: store_key
+
+      - name: date_key
+        description: Surrogate key to dim_date
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+
+      - name: price_rank
+        description: Price ranking (1 = cheapest)
+        data_type: bigint
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 10
+
+      - name: is_cheapest
+        description: Boolean flag if this store has the lowest price
+        data_type: boolean
+        tests:
+          - not_null

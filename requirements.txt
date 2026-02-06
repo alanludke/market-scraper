@@ -8,6 +8,8 @@ xlsxwriter>=3.1.0
 streamlit>=1.30.0
 python-dotenv>=1.0.0
 azure-storage-blob>=12.19.0
+aiohttp>=3.9.0
+beautifulsoup4>=4.12.0
 
 # Observability & Logging (Phase 1)
 loguru>=0.7.0

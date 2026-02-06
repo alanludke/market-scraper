@@ -15,9 +15,10 @@
 {% macro source_parquet(source_name, table_name) %}
 
     {%- set parquet_paths = {
-        'bronze_bistek': '../../../data/bronze/supermarket=bistek/region=*/year=*/month=*/day=*/run_*/*_full.parquet',
-        'bronze_fort': '../../../data/bronze/supermarket=fort/region=*/year=*/month=*/day=*/run_*/*_full.parquet',
-        'bronze_giassi': '../../../data/bronze/supermarket=giassi/region=*/year=*/month=*/day=*/run_*/*_full.parquet'
+        'bronze_bistek': '../../../data/bronze/supermarket=bistek/**/*.parquet',
+        'bronze_fort': '../../../data/bronze/supermarket=fort/**/*.parquet',
+        'bronze_giassi': '../../../data/bronze/supermarket=giassi/**/*.parquet',
+        'bronze_openfoodfacts': '../../../data/bronze/supermarket=openfoodfacts/**/*.parquet'
     } -%}
 
     {%- set path = parquet_paths.get(source_name) -%}
@@ -26,6 +27,6 @@
         {{ exceptions.raise_compiler_error("Unknown source: " ~ source_name) }}
     {%- endif -%}
 
-    read_parquet('{{ path }}', hive_partitioning=1)
+    read_parquet('{{ path }}', hive_partitioning=1, union_by_name=true)
 
 {% endmacro %}

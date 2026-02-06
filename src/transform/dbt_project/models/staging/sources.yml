@@ -158,3 +158,68 @@ sources:
 
           - name: _metadata_scraped_at
             description: Timestamp when data was scraped
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # OPENFOODFACTS (GLOBAL EAN DATABASE)
+  # ─────────────────────────────────────────────────────────────────────────
+  - name: bronze_openfoodfacts
+    description: >
+      Bronze layer from OpenFoodFacts API.
+      Global EAN reference database with nutritional data, product names,
+      brands, and Nutriscore ratings. Used to enrich VTEX products with
+      canonical names and nutritional information.
+
+    meta:
+      source_owner: OpenFoodFacts Community
+      area_owner: Data Engineering
+      email_owner: data-engineering@market-scraper.local
+      refresh_frequency: weekly
+      data_location: data/bronze/supermarket=openfoodfacts/
+
+    tables:
+      - name: products
+        description: >
+          Product data enriched from OpenFoodFacts API.
+          Contains EAN codes, canonical product names, nutritional scores,
+          and product attributes for global food products.
+        external:
+          location: '../../../../data/bronze/supermarket=openfoodfacts/**/*.parquet'
+          file_format: parquet
+
+        meta:
+          contains_pii: false
+          data_retention: 365  # days
+
+        columns:
+          - name: code
+            description: EAN barcode (8, 13, or 14 digits)
+
+          - name: product_name
+            description: Canonical product name from OpenFoodFacts
+
+          - name: brands
+            description: Product brand(s)
+
+          - name: categories
+            description: Product categories (comma-separated)
+
+          - name: quantity
+            description: Net weight (e.g., "500g", "1.5kg")
+
+          - name: nutriscore_grade
+            description: Nutriscore rating (a=best, e=worst)
+
+          - name: countries
+            description: Country of origin
+
+          - name: _metadata_supermarket
+            description: Injected metadata - source name (openfoodfacts)
+
+          - name: _metadata_region
+            description: Injected metadata - region (global)
+
+          - name: _metadata_run_id
+            description: Enrichment run identifier for traceability
+
+          - name: _metadata_scraped_at
+            description: Timestamp when data was fetched from API
