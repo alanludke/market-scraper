@@ -75,6 +75,40 @@ python cli_ingest.py scrape --all
 python cli_ingest.py health
 ```
 
+### EAN Enrichment (OpenFoodFacts)
+
+```bash
+# One-time bulk import (Parquet)
+python cli_enrich.py bulk-import --parquet path/to/openfoodfacts.parquet
+
+# Incremental delta sync (last 14 days)
+python cli_enrich.py delta-sync
+
+# Check enrichment stats
+python cli_enrich.py stats
+
+# Automated daily sync (Prefect)
+# See docs/operations/PREFECT_SETUP.md for full guide
+
+# Test flow locally
+python src/orchestration/delta_sync_flow.py
+
+# Deploy with schedule (9:00 AM daily)
+prefect deploy src/orchestration/delta_sync_flow.py:daily_delta_sync_flow \
+    --name daily-delta-sync \
+    --cron "0 9 * * *" \
+    --pool market-scraper-pool
+
+# Start worker (in separate terminal)
+prefect worker start --pool market-scraper-pool
+
+# View dashboard
+# http://127.0.0.1:4200 (local server)
+
+# Manual trigger
+prefect deployment run daily-delta-sync/daily-delta-sync
+```
+
 ### Transformation (DBT)
 ```bash
 # Run all models
