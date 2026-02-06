@@ -14,6 +14,45 @@ from typing import List, Dict, Any
 from loguru import logger
 
 
+def _clean_empty_structs(obj: Any) -> Any:
+    """
+    Recursively remove empty dict/struct fields from nested data.
+
+    PyArrow cannot serialize empty struct types (dicts with no keys) to Parquet.
+    This function removes them before serialization.
+
+    Args:
+        obj: Any Python object (dict, list, primitive)
+
+    Returns:
+        Cleaned object with empty dicts removed
+
+    Example:
+        >>> data = {"a": 1, "b": {}, "c": {"d": {}}}
+        >>> _clean_empty_structs(data)
+        {"a": 1, "c": {}}
+    """
+    if isinstance(obj, dict):
+        # Remove keys with empty dict values, recursively clean others
+        cleaned = {}
+        for key, value in obj.items():
+            if isinstance(value, dict) and not value:
+                # Skip empty dicts (empty structs)
+                continue
+            else:
+                # Recursively clean the value
+                cleaned[key] = _clean_empty_structs(value)
+        return cleaned
+
+    elif isinstance(obj, list):
+        # Recursively clean list elements
+        return [_clean_empty_structs(item) for item in obj]
+
+    else:
+        # Primitives (str, int, float, bool, None) - return as-is
+        return obj
+
+
 def write_parquet(
     items: List[Dict[str, Any]],
     output_path: Path,
@@ -49,9 +88,13 @@ def write_parquet(
                 item["_metadata"] = {}
             item["_metadata"].update(metadata)
 
+    # Clean empty structs before DataFrame conversion
+    # PyArrow cannot serialize empty dicts (structs with no child fields)
+    cleaned_items = [_clean_empty_structs(item) for item in items]
+
     # Convert to DataFrame
     try:
-        df = pd.json_normalize(items, sep="_")
+        df = pd.json_normalize(cleaned_items, sep="_")
 
         # Ensure output directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
