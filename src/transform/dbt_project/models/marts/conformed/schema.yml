@@ -1,0 +1,84 @@
+version: 2
+
+models:
+  - name: dim_ean
+    description: >
+      EAN dimension with OpenFoodFacts enrichment.
+      One row per unique EAN barcode from VTEX products.
+      Enables product deduplication across stores, price-per-kg normalization,
+      and nutritional value analysis.
+
+    config:
+      tags: ['conformed', 'dimension', 'ean']
+
+    meta:
+      graining: ean_code (one row per unique EAN)
+      contains_pii: false
+      table_owner: Data Engineering
+      model_maturity: production
+
+    columns:
+      - name: ean_key
+        description: Surrogate key for EAN dimension
+        data_type: bigint
+        tests:
+          - unique
+          - not_null
+
+      - name: ean_code
+        description: Natural key - EAN barcode (8, 13, or 14 digits)
+        data_type: varchar
+        tests:
+          - unique
+          - not_null
+
+      - name: canonical_name
+        description: Product name from OpenFoodFacts ('Unknown' if not found)
+        data_type: varchar
+        tests:
+          - not_null
+
+      - name: canonical_brand
+        description: Brand name from OpenFoodFacts ('Unknown' if not found)
+        data_type: varchar
+        tests:
+          - not_null
+
+      - name: categories
+        description: Product categories from OpenFoodFacts (comma-separated)
+        data_type: varchar
+
+      - name: net_weight
+        description: Net weight from OpenFoodFacts (e.g., "500g", "1.5kg")
+        data_type: varchar
+
+      - name: country_of_origin
+        description: Country of origin from OpenFoodFacts
+        data_type: varchar
+
+      - name: nutriscore_grade
+        description: Nutriscore rating (a=best, e=worst)
+        data_type: varchar
+        tests:
+          - accepted_values:
+              values: ['a', 'b', 'c', 'd', 'e']
+
+      - name: nutrition_quality
+        description: Nutriscore classification (Excellent/Good/Fair/Poor/Unknown)
+        data_type: varchar
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Excellent', 'Good', 'Fair', 'Poor', 'Unknown']
+
+      - name: is_enriched
+        description: Whether EAN was found in OpenFoodFacts (true) or not (false)
+        data_type: boolean
+        tests:
+          - not_null
+
+      - name: loaded_at
+        description: Timestamp when dimension was loaded
+        data_type: timestamp
+        tests:
+          - not_null

@@ -1,0 +1,77 @@
+version: 2
+
+models:
+  - name: dim_location
+    description: |
+      Location dimension with unique geographic locations (city + neighborhood).
+      Enables cross-store price comparison in same neighborhood and geospatial analysis.
+
+      Grain: One row per unique location_id (city_neighborhood combination)
+
+    meta:
+      graining: location_key
+      owner: data_team
+      contains_pii: false
+
+    columns:
+      - name: location_key
+        description: Surrogate key for location dimension
+        tests:
+          - not_null
+          - unique
+
+      - name: location_id
+        description: Natural key - original region_code from source (e.g., 'florianopolis_costeira')
+        tests:
+          - not_null
+          - unique
+
+      - name: city_name
+        description: Full city name (e.g., 'Florianópolis', 'Tubarão')
+        tests:
+          - not_null
+
+      - name: city_code
+        description: City code extracted from location_id (e.g., 'florianopolis', 'tubarao')
+        tests:
+          - not_null
+
+      - name: neighborhood_name
+        description: Full neighborhood name (e.g., 'Costeira do Pirajubaé', 'Centro')
+        tests:
+          - not_null
+
+      - name: neighborhood_code
+        description: Neighborhood code extracted from location_id (e.g., 'costeira', 'centro')
+        tests:
+          - not_null
+
+      - name: state_code
+        description: Brazilian state code (SC or RS)
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['SC', 'RS']
+
+      - name: country_code
+        description: ISO 3166-1 alpha-2 country code (always 'BR' for Brazil)
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['BR']
+
+      - name: latitude
+        description: Latitude coordinate for geospatial analysis (future enhancement)
+
+      - name: longitude
+        description: Longitude coordinate for geospatial analysis (future enhancement)
+
+      - name: created_at
+        description: Timestamp when record was first created
+        tests:
+          - not_null
+
+      - name: updated_at
+        description: Timestamp when record was last updated
+        tests:
+          - not_null

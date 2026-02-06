@@ -1,0 +1,101 @@
+version: 2
+
+models:
+  - name: dim_store_location
+    description: |
+      Bridge table connecting stores to locations (many-to-many relationship).
+      Enables queries across store AND location dimensions simultaneously.
+
+      Grain: One row per unique store + location combination
+
+      Example use cases:
+        - "Show all stores in Florianópolis - Centro"
+        - "Which stores are NOT present in Tubarão?"
+        - "Compare prices of Bistek vs Fort in same neighborhood"
+
+    meta:
+      graining: store_location_key
+      owner: data_team
+      contains_pii: false
+
+    columns:
+      - name: store_location_key
+        description: Surrogate key for store-location bridge
+        tests:
+          - not_null
+          - unique
+
+      - name: store_key
+        description: Foreign key to dim_store
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_store')
+              field: store_key
+
+      - name: location_key
+        description: Foreign key to dim_location
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_location')
+              field: location_key
+
+      - name: store_id
+        description: Natural key for store (denormalized from dim_store)
+        tests:
+          - not_null
+
+      - name: location_id
+        description: Natural key for location (denormalized from dim_location)
+        tests:
+          - not_null
+
+      - name: city_name
+        description: City name (denormalized from dim_location for convenience)
+        tests:
+          - not_null
+
+      - name: neighborhood_name
+        description: Neighborhood name (denormalized from dim_location for convenience)
+        tests:
+          - not_null
+
+      - name: store_address
+        description: Full street address of store at this location (future enhancement)
+
+      - name: hub_id
+        description: VTEX hub_id for this store-location combo (from stores.yaml config)
+
+      - name: sc_code
+        description: Sales channel code (VTEX parameter)
+
+      - name: is_active
+        description: Whether store is currently operating at this location
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+      - name: opened_at
+        description: Date when store opened at this location
+
+      - name: closed_at
+        description: Date when store closed at this location (null if still active)
+
+      - name: created_at
+        description: Timestamp when record was first created
+        tests:
+          - not_null
+
+      - name: updated_at
+        description: Timestamp when record was last updated
+        tests:
+          - not_null
+
+    tests:
+      # Ensure each store-location combination is unique
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - store_key
+            - location_key
