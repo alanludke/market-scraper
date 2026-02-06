@@ -15,7 +15,7 @@ Usage:
 """
 
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from datetime import datetime
 
 
@@ -27,7 +27,8 @@ class VTEXImage(BaseModel):
     imageUrl: str
     imageText: Optional[str] = None
 
-    @validator('imageUrl')
+    @field_validator('imageUrl')
+    @classmethod
     def validate_image_url(cls, v):
         """Ensure image URL is valid and not empty."""
         if not v or not v.strip():
@@ -49,35 +50,28 @@ class VTEXOffer(BaseModel):
     Tax: Optional[float] = Field(None, ge=0)
     CacheVersionUsedToCallCheckout: Optional[str] = None
 
-    @validator('ListPrice', always=True)
-    def validate_list_price(cls, v, values):
-        """Ensure ListPrice >= Price (if present)."""
-        if v is not None and 'Price' in values:
-            if v < values['Price']:
-                # ListPrice should be >= Price (discount scenario)
-                # If not, it's likely a data quality issue
-                raise ValueError(f"ListPrice ({v}) cannot be less than Price ({values['Price']})")
-        return v
-
-    @root_validator
-    def validate_offer(cls, values):
+    @model_validator(mode='after')
+    def validate_offer(self):
         """Cross-field validation for offer consistency."""
-        price = values.get('Price')
-        list_price = values.get('ListPrice')
-        price_without_discount = values.get('PriceWithoutDiscount')
-
-        # If ListPrice is missing, default to Price (no discount)
-        if list_price is None and price is not None:
-            values['ListPrice'] = price
-
-        # If PriceWithoutDiscount exists, it should be >= Price
-        if price_without_discount is not None and price is not None:
-            if price_without_discount < price:
+        # Ensure ListPrice >= Price
+        if self.ListPrice is not None and self.Price is not None:
+            if self.ListPrice < self.Price:
                 raise ValueError(
-                    f"PriceWithoutDiscount ({price_without_discount}) cannot be less than Price ({price})"
+                    f"ListPrice ({self.ListPrice}) cannot be less than Price ({self.Price})"
                 )
 
-        return values
+        # If ListPrice is missing, default to Price (no discount)
+        if self.ListPrice is None and self.Price is not None:
+            self.ListPrice = self.Price
+
+        # If PriceWithoutDiscount exists, it should be >= Price
+        if self.PriceWithoutDiscount is not None and self.Price is not None:
+            if self.PriceWithoutDiscount < self.Price:
+                raise ValueError(
+                    f"PriceWithoutDiscount ({self.PriceWithoutDiscount}) cannot be less than Price ({self.Price})"
+                )
+
+        return self
 
 
 class VTEXSeller(BaseModel):
@@ -88,7 +82,8 @@ class VTEXSeller(BaseModel):
     sellerDefault: Optional[bool] = None
     commertialOffer: VTEXOffer
 
-    @validator('sellerId')
+    @field_validator('sellerId')
+    @classmethod
     def validate_seller_id(cls, v):
         """Ensure sellerId is not empty."""
         if not v or not v.strip():
@@ -110,14 +105,16 @@ class VTEXItem(BaseModel):
     images: List[VTEXImage] = Field(default_factory=list)
     Videos: Optional[List[str]] = Field(default_factory=list)
 
-    @validator('itemId')
+    @field_validator('itemId')
+    @classmethod
     def validate_item_id(cls, v):
         """Ensure itemId is not empty."""
         if not v or not v.strip():
             raise ValueError("itemId cannot be empty")
         return v
 
-    @validator('ean')
+    @field_validator('ean')
+    @classmethod
     def validate_ean(cls, v):
         """Validate EAN format (if present)."""
         if v is not None and v.strip():
@@ -131,7 +128,8 @@ class VTEXItem(BaseModel):
             return cleaned_ean
         return v
 
-    @validator('sellers')
+    @field_validator('sellers')
+    @classmethod
     def validate_sellers_not_empty(cls, v):
         """Ensure at least one seller exists."""
         if not v or len(v) == 0:
@@ -144,7 +142,8 @@ class VTEXCategory(BaseModel):
     id: str
     name: str
 
-    @validator('id', 'name')
+    @field_validator('id', 'name')
+    @classmethod
     def validate_not_empty(cls, v):
         """Ensure category fields are not empty."""
         if not v or not v.strip():
@@ -181,14 +180,16 @@ class VTEXProduct(BaseModel):
     allSpecifications: Optional[List[str]] = Field(default_factory=list)
     allSpecificationsGroups: Optional[List[str]] = Field(default_factory=list)
 
-    @validator('productId')
+    @field_validator('productId')
+    @classmethod
     def validate_product_id(cls, v):
         """Ensure productId is not empty."""
         if not v or not v.strip():
             raise ValueError("productId cannot be empty")
         return v
 
-    @validator('productName')
+    @field_validator('productName')
+    @classmethod
     def validate_product_name(cls, v):
         """Ensure productName is not empty and reasonable length."""
         if not v or not v.strip():
@@ -197,7 +198,8 @@ class VTEXProduct(BaseModel):
             raise ValueError(f"productName too long ({len(v)} chars, max 500)")
         return v.strip()
 
-    @validator('link')
+    @field_validator('link')
+    @classmethod
     def validate_link(cls, v):
         """Ensure product link is valid."""
         if not v or not v.strip():
@@ -207,28 +209,26 @@ class VTEXProduct(BaseModel):
             v = v.replace("http://", "https://", 1)
         return v
 
-    @validator('items')
+    @field_validator('items')
+    @classmethod
     def validate_items_not_empty(cls, v):
         """Ensure product has at least one item/SKU."""
         if not v or len(v) == 0:
             raise ValueError("Product must have at least one item")
         return v
 
-    @root_validator
-    def validate_product(cls, values):
+    @model_validator(mode='after')
+    def validate_product(self):
         """Cross-field validation for product consistency."""
-        product_id = values.get('productId')
-        items = values.get('items', [])
-
         # Ensure all items belong to this product (some APIs return inconsistent data)
         # This is a sanity check, not strictly enforced by VTEX API
-        for item in items:
-            if not item.itemId.startswith(str(product_id)):
+        for item in self.items:
+            if not item.itemId.startswith(str(self.productId)):
                 # Don't fail, but this could indicate API issues
                 # Log this in the scraper when validation passes
                 pass
 
-        return values
+        return self
 
     class Config:
         """Pydantic config."""
@@ -247,7 +247,8 @@ class VTEXCategoryTree(BaseModel):
     url: Optional[str] = None
     children: Optional[List['VTEXCategoryTree']] = None
 
-    @validator('id')
+    @field_validator('id')
+    @classmethod
     def validate_id_positive(cls, v):
         """Ensure category ID is positive."""
         if v <= 0:
