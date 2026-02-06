@@ -34,3 +34,12 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# DBT
+src/transform/dbt_project/target/
+src/transform/dbt_project/logs/
+src/transform/dbt_project/dbt_packages/
+*.parquet
+
+# Indicium repos (local reference only)
+indicium_repos
