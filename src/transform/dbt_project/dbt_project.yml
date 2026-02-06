@@ -1,0 +1,117 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# dbt_project.yml - Market Scraper Analytics
+# Baseado nas boas práticas Indicium DBT Core Reference
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: 'market_scraper'
+version: '1.0.0'
+config-version: 2
+
+# Profile dinâmico via env var (padrão Indicium)
+# Fallback para 'market_scraper' se env var não definido
+profile: "{{ env_var('DBT_PROFILE_TARGET', 'market_scraper') }}"
+
+# Diretórios do projeto
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+# Outputs
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MODELS CONFIGURATION (Layered Modeling)
+# ═══════════════════════════════════════════════════════════════════════════
+
+models:
+  market_scraper:
+
+    # ────────────────────────────────────────────────────────────────────────
+    # STAGING LAYER: Dados brutos dos scrapers (ephemeral)
+    # ────────────────────────────────────────────────────────────────────────
+    staging:
+      +materialized: ephemeral
+      +schema: staging
+      +docs:
+        node_color: "#F4A460"  # Sandy brown - raw data
+
+    # ────────────────────────────────────────────────────────────────────────
+    # TRUSTED LAYER: Lógica de negócio, sumarizações
+    # ────────────────────────────────────────────────────────────────────────
+    trusted:
+      +materialized: table
+      +schema: trusted
+      +contract:
+        enforced: true
+      +docs:
+        node_color: "#4682B4"  # Steel blue - business logic
+
+    # ────────────────────────────────────────────────────────────────────────
+    # MARTS LAYER: Modelos analíticos por domínio
+    # ────────────────────────────────────────────────────────────────────────
+    marts:
+      +materialized: table
+      +contract:
+        enforced: true
+
+      # Pricing Marts: Análise de preços, competitividade
+      pricing_marts:
+        +schema: pricing_marts
+        +tags: ['pricing', 'analytics']
+        +docs:
+          node_color: "#32CD32"  # Lime green - analytics
+
+      # Inventory Marts: Análise de disponibilidade, catálogo
+      inventory_marts:
+        +schema: inventory_marts
+        +tags: ['inventory', 'catalog']
+        +docs:
+          node_color: "#FFD700"  # Gold - inventory
+
+      # Conformed Dimensions: Dimensões compartilhadas
+      conformed:
+        +schema: conformed
+        +tags: ['conformed', 'dimension']
+        +docs:
+          node_color: "#9370DB"  # Medium purple - shared
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SNAPSHOTS CONFIGURATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+snapshots:
+  +target_schema: snapshots
+  +strategy: timestamp
+  +updated_at: scraped_at
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DOCUMENTATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Persist docs apenas em prod/ci (padrão Indicium)
+vars:
+  persist_docs_target: "{{ target.name in ('prod', 'ci') }}"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PROJECT VARIABLES
+# ═══════════════════════════════════════════════════════════════════════════
+
+vars:
+  # Partições para incremental (usado em transformações)
+  # Formato: lista de datas a reprocessar
+  partitions_to_replace: []
+
+  # Threshold de qualidade de dados (Great Expectations)
+  quality_threshold: 0.95
+
+  # Regiões ativas (filtro para modelos)
+  active_regions: []
+
+  # Supermercados ativos
+  active_stores: ['bistek', 'fort', 'giassi']

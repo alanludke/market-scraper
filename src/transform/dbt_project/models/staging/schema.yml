@@ -1,0 +1,41 @@
+version: 2
+
+models:
+  - name: stg_vtex__products
+    description: >
+      Staging model que unifica dados brutos de produtos dos 3 supermercados VTEX.
+      Ephemeral layer - sem materialização.
+
+    columns:
+      - name: product_id
+        description: Unique product identifier from VTEX (String format)
+
+      - name: product_name
+        description: Product name as displayed in e-commerce
+
+      - name: brand
+        description: Product brand (can be null for generic products)
+
+      - name: product_url
+        description: Full URL to product page
+
+      - name: items
+        description: Nested array of product SKUs with pricing and availability
+
+      - name: supermarket
+        description: Store identifier (bistek, fort, giassi)
+
+      - name: region
+        description: Geographic region code (ex florianopolis_costeira)
+
+      - name: postal_code
+        description: Brazilian postal code (CEP) for the region
+
+      - name: hub_id
+        description: VTEX seller/hub identifier for pricing
+
+      - name: run_id
+        description: Scraper execution identifier for traceability
+
+      - name: scraped_at
+        description: Timestamp when data was collected

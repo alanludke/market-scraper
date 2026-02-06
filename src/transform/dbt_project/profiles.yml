@@ -1,0 +1,56 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# profiles.yml - DuckDB Connection Profile
+# Baseado nas boas práticas Indicium (dynamic targets via env vars)
+# ═══════════════════════════════════════════════════════════════════════════
+
+market_scraper:
+  # Target dinâmico via env var (dev, ci, prod)
+  # Fallback para 'dev' se não definido
+  target: "{{ env_var('DBT_DEFAULT_TARGET', 'dev') }}"
+
+  outputs:
+    # ────────────────────────────────────────────────────────────────────────
+    # DEV: Ambiente de desenvolvimento local
+    # ────────────────────────────────────────────────────────────────────────
+    dev:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', '../../../data/analytics.duckdb') }}"
+      # Schema dinâmico por dev (padrão Indicium: usar username ou branch)
+      schema: "{{ env_var('DEV_SCHEMA_NAME', 'dev_' ~ env_var('USER', 'local')) }}"
+      threads: 4
+      extensions:
+        - parquet
+        - json
+      settings:
+        # Desabilitar progress bar (evita poluir logs)
+        enable_progress_bar: false
+
+    # ────────────────────────────────────────────────────────────────────────
+    # CI: Ambiente de testes em CI/CD
+    # ────────────────────────────────────────────────────────────────────────
+    ci:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', '../../../data/analytics_ci.duckdb') }}"
+      schema: ci_{{ env_var('GITHUB_RUN_ID', 'local') }}  # Schema por CI run
+      threads: 8
+      extensions:
+        - parquet
+        - json
+      settings:
+        enable_progress_bar: false
+        allow_unsigned_extensions: true
+
+    # ────────────────────────────────────────────────────────────────────────
+    # PROD: Ambiente de produção
+    # ────────────────────────────────────────────────────────────────────────
+    prod:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', '../../../data/analytics_prod.duckdb') }}"
+      schema: main  # Schema fixo em prod
+      threads: 8
+      extensions:
+        - parquet
+        - json
+      settings:
+        enable_progress_bar: false
+        allow_unsigned_extensions: true

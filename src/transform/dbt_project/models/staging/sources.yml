@@ -1,0 +1,160 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# sources.yml - External Bronze Layer Sources
+# Parquet files gerados pelos scrapers VTEX
+# ═══════════════════════════════════════════════════════════════════════════
+
+version: 2
+
+sources:
+  # ─────────────────────────────────────────────────────────────────────────
+  # BISTEK SUPERMARKET
+  # ─────────────────────────────────────────────────────────────────────────
+  - name: bronze_bistek
+    description: >
+      Bronze layer data from Bistek supermarket scraper (VTEX platform).
+      Raw product data scraped daily from 13 regions in Florianópolis.
+
+    meta:
+      source_owner: Alan Ludke
+      area_owner: Data Engineering
+      email_owner: alan.ludke@indicium.tech
+      refresh_frequency: daily
+      data_location: data/bronze/supermarket=bistek/
+
+    tables:
+      - name: products
+        description: Raw product catalog with prices and availability per region
+        external:
+          location: '../../../../data/bronze/supermarket=bistek/**/*.parquet'
+          file_format: parquet
+
+        meta:
+          contains_pii: false
+          data_retention: 365  # days
+
+        columns:
+          - name: productId
+            description: Unique product identifier from VTEX
+
+          - name: productName
+            description: Product name as displayed in e-commerce
+
+          - name: brand
+            description: Product brand
+
+          - name: items
+            description: Nested array of product variants (SKUs)
+
+          - name: _metadata_supermarket
+            description: Injected metadata - store name (bistek)
+
+          - name: _metadata_region
+            description: Injected metadata - region code (ex florianopolis_costeira)
+
+          - name: _metadata_run_id
+            description: Scraper run identifier for traceability
+
+          - name: _metadata_scraped_at
+            description: Timestamp when data was scraped
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # FORT ATACADISTA
+  # ─────────────────────────────────────────────────────────────────────────
+  - name: bronze_fort
+    description: >
+      Bronze layer data from Fort Atacadista scraper (VTEX platform).
+      Raw product data scraped daily from 7 regions in Santa Catarina.
+
+    meta:
+      source_owner: Alan Ludke
+      area_owner: Data Engineering
+      email_owner: alan.ludke@indicium.tech
+      refresh_frequency: daily
+      data_location: data/bronze/supermarket=fort/
+
+    tables:
+      - name: products
+        description: Raw product catalog with prices and availability per region
+        external:
+          location: '../../../../data/bronze/supermarket=fort/**/*.parquet'
+          file_format: parquet
+
+        meta:
+          contains_pii: false
+          data_retention: 365
+
+        columns:
+          - name: productId
+            description: Unique product identifier from VTEX
+
+          - name: productName
+            description: Product name as displayed in e-commerce
+
+          - name: brand
+            description: Product brand
+
+          - name: items
+            description: Nested array of product variants (SKUs)
+
+          - name: _metadata_supermarket
+            description: Injected metadata - store name (fort)
+
+          - name: _metadata_region
+            description: Injected metadata - region code
+
+          - name: _metadata_run_id
+            description: Scraper run identifier for traceability
+
+          - name: _metadata_scraped_at
+            description: Timestamp when data was scraped
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # GIASSI SUPERMERCADOS
+  # ─────────────────────────────────────────────────────────────────────────
+  - name: bronze_giassi
+    description: >
+      Bronze layer data from Giassi Supermercados scraper (VTEX platform).
+      Raw product data scraped daily from 17 regions in Santa Catarina.
+
+    meta:
+      source_owner: Alan Ludke
+      area_owner: Data Engineering
+      email_owner: alan.ludke@indicium.tech
+      refresh_frequency: daily
+      data_location: data/bronze/supermarket=giassi/
+
+    tables:
+      - name: products
+        description: Raw product catalog with prices and availability per region
+        external:
+          location: '../../../../data/bronze/supermarket=giassi/**/*.parquet'
+          file_format: parquet
+
+        meta:
+          contains_pii: false
+          data_retention: 365
+
+        columns:
+          - name: productId
+            description: Unique product identifier from VTEX
+
+          - name: productName
+            description: Product name as displayed in e-commerce
+
+          - name: brand
+            description: Product brand
+
+          - name: items
+            description: Nested array of product variants (SKUs)
+
+          - name: _metadata_supermarket
+            description: Injected metadata - store name (giassi)
+
+          - name: _metadata_region
+            description: Injected metadata - region code
+
+          - name: _metadata_run_id
+            description: Scraper run identifier for traceability
+
+          - name: _metadata_scraped_at
+            description: Timestamp when data was scraped
