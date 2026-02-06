@@ -1,13 +1,11 @@
 {#
     Macro: generate_schema_name
 
-    Gera nome do schema baseado no target (padrão Indicium).
+    Gera nome do schema baseado no target.
 
     Lógica:
     - Prod/CI: Usa custom_schema_name se definido (ex: pricing_marts, trusted)
     - Dev: Usa target.schema (ex: dev_alan, permitindo isolamento por dev)
-
-    Baseado em: indimesh_dbt_core_reference/macros/general_config/generate_schema_name.sql
 #}
 
 {% macro generate_schema_name(custom_schema_name, node) -%}

@@ -1,0 +1,64 @@
+---
+name: DBT Test
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'src/transform/dbt_project/**'
+
+  workflow_dispatch:
+
+jobs:
+  dbt-test:
+    name: DBT Parse, Compile & Test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: src/transform/dbt_project
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install dbt-duckdb==1.9.1
+
+      - name: Install dbt packages
+        run: dbt deps
+
+      - name: DBT Parse
+        run: dbt parse
+        env:
+          PYTHONUTF8: '1'
+
+      - name: DBT Compile (check SQL compilation)
+        run: dbt compile
+        env:
+          PYTHONUTF8: '1'
+
+      # Note: dbt test requires data to exist, so we skip it in CI
+      # Uncomment below if you want to run tests (requires bronze data)
+      # - name: DBT Test
+      #   run: dbt test
+      #   env:
+      #     PYTHONUTF8: '1'
+
+      - name: Check for compilation warnings
+        if: always()
+        run: |
+          if [ -f logs/dbt.log ]; then
+            echo "=== DBT Log Output ==="
+            tail -n 50 logs/dbt.log
+          fi

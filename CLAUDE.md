@@ -273,6 +273,92 @@ Estratégias:
 - ✅ Retention (deletar dados > 1 ano)
 - ✅ Incremental processing (não reprocessar tudo sempre)
 
+## Documentação
+
+O projeto possui documentação abrangente em `docs/`:
+
+### Development
+- **[GIT_FLOW.md](docs/development/GIT_FLOW.md)**: Workflow trunk-based, convenções de branch, PR template
+- **[TESTING_STRATEGY.md](docs/quality/TESTING_STRATEGY.md)**: Estratégia de testes DBT por camada (staging, trusted, marts)
+
+### Architecture
+- **[ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md)**: Visão geral da arquitetura ELT, stack tecnológico, data flow
+- **[DATA_LAYERS.md](docs/architecture/DATA_LAYERS.md)**: Guia completo da arquitetura Medallion (5 camadas: Raw → Staging → Trusted → Marts → Serving)
+- **[SNAPSHOTS.md](docs/architecture/SNAPSHOTS.md)**: Guia completo de DBT snapshots (SCD Type 2) para histórico de preços
+- **[INCREMENTAL_MODELS.md](docs/architecture/INCREMENTAL_MODELS.md)**: Estratégias incrementais (merge, append, watermarking)
+
+### Templates
+- **[EDA_TEMPLATE.md](docs/templates/EDA_TEMPLATE.md)**: Checklist de 10 seções para adicionar nova fonte de dados
+- **[KPI_MATRIX.md](docs/templates/KPI_MATRIX.md)**: Template para documentar KPIs e implementação (pricing, catalog, operational)
+- **[PR_CHECKLIST.md](docs/templates/PR_CHECKLIST.md)**: Checklist completo para PRs (testing, data quality, documentation, schema)
+- **[KIMBALL_BUS_MATRIX.md](docs/templates/KIMBALL_BUS_MATRIX.md)**: Template de Bus Matrix para dimensões conformadas (dimensional modeling)
+- **[LOGICAL_DATA_MODEL.md](docs/templates/LOGICAL_DATA_MODEL.md)**: Template de modelo lógico de dados com ERD (Entity-Relationship Diagram)
+
+### Quality
+- **[TESTING_STRATEGY.md](docs/quality/TESTING_STRATEGY.md)**: Estratégia de testes DBT por camada (staging, trusted, marts)
+- **[PROJECT_QUALITY_STANDARDS.md](docs/quality/PROJECT_QUALITY_STANDARDS.md)**: Padrões de qualidade (linting, validation, CI/CD enforcement)
+
+### Setup
+- **[SETUP.md](SETUP.md)**: Guia de configuração inicial (Windows UTF-8, DBT, DuckDB)
+- **[src/transform/dbt_project/README.md](src/transform/dbt_project/README.md)**: Referência rápida de comandos DBT
+
+## Quality Assurance
+
+### Linting & Formatting
+```bash
+# SQL linting com SQLFluff (DuckDB dialect)
+cd src/transform/dbt_project
+sqlfluff lint models/ --dialect duckdb
+
+# Auto-fix SQL issues
+sqlfluff fix models/ --dialect duckdb
+
+# YAML linting
+yamllint -c .yamllint models/
+```
+
+**Configs**:
+- `.sqlfluff`: SQLFluff config para DuckDB + DBT templater
+- `.yamllint`: YAML linting rules para DBT schemas
+
+### Pre-commit Hooks
+```bash
+# Install pre-commit
+pip install pre-commit
+
+# Install hooks
+cd src/transform/dbt_project
+pre-commit install
+
+# Run manually
+pre-commit run --all-files
+```
+
+**Hooks configurados** (`.pre-commit-config.yaml`):
+- ✅ `dbt-parse`: Valida projeto DBT compila
+- ✅ `check-script-semicolon`: Proíbe semicolons em SQL
+- ✅ `check-model-columns-have-desc`: Exige descrição de colunas (trusted/marts)
+- ✅ `check-model-has-description`: Exige descrição de modelos
+- ✅ `check-model-has-meta-keys`: Valida metadados obrigatórios (graining, owner, contains_pii)
+- ✅ `check-model-name-contract`: Valida naming conventions (stg_*, tru_*, fct_*, dim_*)
+- ✅ `sqlfluff-lint`: Lint SQL com SQLFluff
+- ✅ `yamllint`: Lint YAML schemas
+
+### CI/CD (GitHub Actions)
+**Workflows**:
+- **[.github/workflows/lint.yml](.github/workflows/lint.yml)**: Roda SQLFluff + YAML lint em PRs
+- **[.github/workflows/test.yml](.github/workflows/test.yml)**: Roda `dbt parse` e `dbt compile` em PRs
+
+```bash
+# Triggers automáticos:
+# - PRs para main/master
+# - Modificações em src/transform/dbt_project/**
+
+# Execução manual:
+gh workflow run lint.yml
+gh workflow run test.yml
+```
+
 ## Troubleshooting
 
 ### "Scraper falhou sem logs"

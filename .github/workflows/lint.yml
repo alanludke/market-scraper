@@ -1,0 +1,72 @@
+---
+name: Lint (SQL + YAML)
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'src/transform/dbt_project/**/*.sql'
+      - 'src/transform/dbt_project/**/*.yml'
+      - 'src/transform/dbt_project/**/*.yaml'
+
+  workflow_dispatch:
+
+jobs:
+  sqlfluff-lint:
+    name: SQLFluff Lint
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: src/transform/dbt_project
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install sqlfluff==3.3.0 sqlfluff-templater-dbt==3.3.0 dbt-duckdb==1.9.1
+
+      - name: Install dbt packages
+        run: dbt deps
+
+      - name: Lint SQL files
+        run: |
+          sqlfluff lint models/ \
+            --dialect duckdb \
+            --config .sqlfluff \
+            --format github-annotation-native
+        continue-on-error: true
+
+  yamllint:
+    name: YAML Lint
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: src/transform/dbt_project
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install yamllint
+        run: pip install yamllint==1.35.1
+
+      - name: Lint YAML files
+        run: yamllint -c .yamllint models/

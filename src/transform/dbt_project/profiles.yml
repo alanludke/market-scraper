@@ -1,6 +1,6 @@
 # ═══════════════════════════════════════════════════════════════════════════
 # profiles.yml - DuckDB Connection Profile
-# Baseado nas boas práticas Indicium (dynamic targets via env vars)
+# Dynamic targets via environment variables
 # ═══════════════════════════════════════════════════════════════════════════
 
 market_scraper:
@@ -15,7 +15,7 @@ market_scraper:
     dev:
       type: duckdb
       path: "{{ env_var('DBT_DUCKDB_PATH', '../../../data/analytics.duckdb') }}"
-      # Schema dinâmico por dev (padrão Indicium: usar username ou branch)
+      # Schema dinâmico por dev (usando username ou branch)
       schema: "{{ env_var('DEV_SCHEMA_NAME', 'dev_' ~ env_var('USER', 'local')) }}"
       threads: 4
       extensions:

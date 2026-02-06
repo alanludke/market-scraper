@@ -1,13 +1,12 @@
 # ═══════════════════════════════════════════════════════════════════════════
 # dbt_project.yml - Market Scraper Analytics
-# Baseado nas boas práticas Indicium DBT Core Reference
 # ═══════════════════════════════════════════════════════════════════════════
 
 name: 'market_scraper'
 version: '1.0.0'
 config-version: 2
 
-# Profile dinâmico via env var (padrão Indicium)
+# Profile dinâmico via env var (DBT_PROFILE_TARGET)
 # Fallback para 'market_scraper' se env var não definido
 profile: "{{ env_var('DBT_PROFILE_TARGET', 'market_scraper') }}"
 
@@ -95,7 +94,7 @@ snapshots:
 # ═══════════════════════════════════════════════════════════════════════════
 
 vars:
-  # Persist docs apenas em prod/ci (padrão Indicium)
+  # Persist docs apenas em prod/ci
   persist_docs_target: "{{ target.name in ('prod', 'ci') }}"
 
   # Partições para incremental (usado em transformações)

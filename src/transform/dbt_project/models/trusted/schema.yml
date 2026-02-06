@@ -10,19 +10,19 @@ models:
       contract:
         enforced: true
 
-      # Meta tags obrigatórias (padrão Indicium)
+      # Meta tags obrigatórias
       meta: &meta_tru_product
         graining: product_region_date
         contains_pii: false
         table_owner: Alan Ludke
         area_owner: Data Engineering
-        email_owner: alan.ludke@indicium.tech
+        email_owner: data-engineering@market-scraper.local
         model_maturity: medium
         access_type: public
         load_frequency: daily
         main_kpis: min_price, avg_price, is_available, sku_count
 
-      # Propaga tags para Databricks (padrão Indicium)
+      # Propaga tags para Databricks
       databricks_tags: *meta_tru_product
 
     # Contract: Define schema explicitamente

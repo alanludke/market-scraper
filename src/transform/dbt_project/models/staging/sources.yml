@@ -17,7 +17,7 @@ sources:
     meta:
       source_owner: Alan Ludke
       area_owner: Data Engineering
-      email_owner: alan.ludke@indicium.tech
+      email_owner: data-engineering@market-scraper.local
       refresh_frequency: daily
       data_location: data/bronze/supermarket=bistek/
 
@@ -68,7 +68,7 @@ sources:
     meta:
       source_owner: Alan Ludke
       area_owner: Data Engineering
-      email_owner: alan.ludke@indicium.tech
+      email_owner: data-engineering@market-scraper.local
       refresh_frequency: daily
       data_location: data/bronze/supermarket=fort/
 
@@ -119,7 +119,7 @@ sources:
     meta:
       source_owner: Alan Ludke
       area_owner: Data Engineering
-      email_owner: alan.ludke@indicium.tech
+      email_owner: data-engineering@market-scraper.local
       refresh_frequency: daily
       data_location: data/bronze/supermarket=giassi/
 

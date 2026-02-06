@@ -1,0 +1,132 @@
+---
+# pre-commit hooks for Market Scraper DBT project
+# https://pre-commit.com/
+
+files: ^models/
+fail_fast: false
+
+repos:
+  # DBT-specific checks
+  - repo: https://github.com/dbt-checkpoint/dbt-checkpoint
+    rev: v2.0.6
+    hooks:
+      # Parse DBT project (ensure it compiles)
+      - id: dbt-parse
+        name: DBT Parse
+
+      # Check for semicolons in SQL (not needed in DBT)
+      - id: check-script-semicolon
+        name: Check Semicolons
+        description: Check if there are any semicolons in the SQL code
+        files: .*(models\/).*
+        exclude: .*(dbt_packages|samples|exposures|sources).*
+
+      # Check column descriptions in trusted and marts layers
+      - id: check-model-columns-have-desc
+        name: Check Columns Description (Trusted)
+        description: Check if all columns have descriptions
+        files: .*(trusted\/).*
+        exclude: .*(dbt_packages|staging|samples|exposures|sources).*
+
+      - id: check-model-columns-have-desc
+        name: Check Columns Description (Marts)
+        description: Check if all columns have descriptions
+        files: .*(marts\/).*
+        exclude: .*(dbt_packages|staging|samples|exposures|sources).*
+
+      # Check model descriptions
+      - id: check-model-has-description
+        name: Check Models Description (Trusted)
+        description: Check if all trusted models have descriptions
+        files: .*(trusted\/).*
+        exclude: .*(dbt_packages|staging|samples|exposures|sources).*
+
+      - id: check-model-has-description
+        name: Check Models Description (Marts)
+        description: Check if all marts models have descriptions
+        files: .*(marts\/).*
+        exclude: .*(dbt_packages|staging|samples|exposures|sources).*
+
+      # Check metadata keys
+      - id: check-model-has-meta-keys
+        name: Check dbt-meta (Trusted)
+        description: Check if all metadata has been properly filled
+        files: .*(trusted\/).*
+        exclude: .*(dbt_packages|staging|samples|exposures|sources).*
+        args: ['--meta-keys', 'graining', 'owner', 'access_type', 'contains_pii', 'main_kpis', "--"]
+
+      - id: check-model-has-meta-keys
+        name: Check dbt-meta (Marts)
+        description: Check if all metadata has been properly filled
+        files: .*(marts\/).*
+        exclude: .*(dbt_packages|staging|samples|exposures|sources).*
+        args: ['--meta-keys', 'graining', 'owner', 'access_type', 'contains_pii', 'main_kpis', 'product_usage', "--"]
+
+      # Check naming conventions
+      - id: check-model-name-contract
+        name: Check Model Name (Staging)
+        description: Check the prefix Model Name in Staging (stg_*)
+        args: [--pattern, "stg_[a-z0-9_]+"]
+        files: .*(staging\/).*
+        exclude: .*(dbt_packages|trusted|marts|samples|exposures|sources).*
+
+      - id: check-model-name-contract
+        name: Check Model Name (Trusted)
+        description: Check the prefix Model Name in Trusted (tru_*)
+        args: [--pattern, "tru_[a-z0-9_]+"]
+        files: .*(trusted\/).*
+        exclude: .*(dbt_packages|staging|marts|samples|exposures|sources).*
+
+      - id: check-model-name-contract
+        name: Check Model Name (Marts)
+        description: Check the prefix Model Name in Marts (fct_* or dim_*)
+        args: [--pattern, "^(fct_|dim_)[a-z0-9_]+$"]
+        files: .*(marts\/).*
+        exclude: .*(dbt_packages|staging|trusted|samples|exposures|sources).*
+
+  # SQL linting with SQLFluff
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 3.3.0
+    hooks:
+      - id: sqlfluff-lint
+        name: SQLFluff Lint
+        description: Lint SQL files with SQLFluff
+        files: ^models/.*\.sql$
+        additional_dependencies: ['dbt-duckdb==1.9.1', 'sqlfluff-templater-dbt==3.3.0']
+        args: ['--dialect', 'duckdb', '--config', '.sqlfluff']
+
+      - id: sqlfluff-fix
+        name: SQLFluff Fix
+        description: Auto-fix SQL issues (run manually)
+        files: ^models/.*\.sql$
+        additional_dependencies: ['dbt-duckdb==1.9.1', 'sqlfluff-templater-dbt==3.3.0']
+        args: ['--dialect', 'duckdb', '--config', '.sqlfluff']
+        stages: [manual]
+
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        name: YAML Lint
+        description: Lint YAML files
+        files: \.(yaml|yml)$
+        args: ['-c', '.yamllint']
+
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim Trailing Whitespace
+      - id: end-of-file-fixer
+        name: Fix End of Files
+      - id: check-yaml
+        name: Check YAML Syntax
+        exclude: .*(dbt_packages).*
+      - id: check-added-large-files
+        name: Check Large Files
+        args: ['--maxkb=1000']
+      - id: mixed-line-ending
+        name: Check Line Endings
+        args: ['--fix=lf']
