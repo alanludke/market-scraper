@@ -4,52 +4,28 @@ Transformations layer using DBT (data build tool) for the Market Scraper platfor
 
 ## Quick Start
 
-### Using the DBT Wrapper (Recommended)
-
-To avoid encoding issues on Windows, use the provided wrapper scripts:
-
-**Command Prompt / Git Bash:**
 ```bash
 cd src/transform/dbt_project
-./dbt.bat debug
-./dbt.bat parse
-./dbt.bat run
-./dbt.bat test
-```
 
-**PowerShell:**
-```powershell
-cd src\transform\dbt_project
-.\dbt.ps1 debug
-.\dbt.ps1 parse
-.\dbt.ps1 run
-.\dbt.ps1 test
-```
-
-The wrappers automatically set `PYTHONUTF8=1` so you don't need to prefix every command.
-
-### Using DBT Directly
-
-If you prefer to use `dbt` directly:
-
-**Windows (Command Prompt):**
-```cmd
-set PYTHONUTF8=1
+# Validate connection
 dbt debug
+
+# Run transformations
+dbt run
+
+# Test data quality
+dbt test
+
+# Generate documentation
+dbt docs generate && dbt docs serve
 ```
 
-**Linux/Mac:**
-```bash
-export PYTHONUTF8=1
-dbt debug
-```
+**Note**: Windows users should use PowerShell (UTF-8 configured). See [SETUP.md](../../../SETUP.md) for initial configuration.
 
 ## Project Structure
 
 ```
 dbt_project/
-├── dbt.bat              # Windows wrapper script
-├── dbt.ps1              # PowerShell wrapper script
 ├── dbt_project.yml      # Project configuration
 ├── profiles.yml         # Connection profiles (dev/ci/prod)
 ├── models/              # SQL models
@@ -87,45 +63,45 @@ dbt_project/
 
 ```bash
 # Validate setup
-./dbt.bat debug
+dbt debug
 
 # Parse and validate models
-./dbt.bat parse
+dbt parse
 
 # Compile SQL (preview compiled output)
-./dbt.bat compile --select stg_vtex__products
+dbt compile --select stg_vtex__products
 
 # Run models (materialize tables)
-./dbt.bat run
+dbt run
 
 # Run specific model
-./dbt.bat run --select tru_product
+dbt run --select tru_product
 
 # Run model and downstream dependencies
-./dbt.bat run --select tru_product+
+dbt run --select tru_product+
 
 # Test data quality
-./dbt.bat test
+dbt test
 
 # Test specific model
-./dbt.bat test --select tru_product
+dbt test --select tru_product
 
 # Generate documentation
-./dbt.bat docs generate
-./dbt.bat docs serve  # Opens browser at localhost:8080
+dbt docs generate
+dbt docs serve  # Opens browser at localhost:8080
 ```
 
 ### CI/CD Commands
 
 ```bash
 # Run only modified models (slim CI)
-./dbt.bat run --select state:modified+
+dbt run --select state:modified+
 
 # Run only failed tests
-./dbt.bat test --select result:fail
+dbt test --select result:fail
 
 # Fresh data check (validate source freshness)
-./dbt.bat source freshness
+dbt source freshness
 ```
 
 ## Profiles Configuration
@@ -140,13 +116,13 @@ Switch targets using:
 
 ```bash
 # Use default (dev)
-./dbt.bat run
+dbt run
 
 # Use CI target
-./dbt.bat run --target ci
+dbt run --target ci
 
 # Use prod target
-./dbt.bat run --target prod
+dbt run --target prod
 ```
 
 ## Environment Variables
@@ -170,7 +146,7 @@ set DEV_SCHEMA_NAME=dev_alan
 The database file is locked. Close any other connections (Python scripts, DBeaver).
 
 ### Error: "UnicodeDecodeError"
-Use the wrapper scripts (`dbt.bat` or `dbt.ps1`) or set `PYTHONUTF8=1` manually.
+Windows: Use PowerShell. See [SETUP.md](../../../SETUP.md) for UTF-8 configuration.
 
 ### Warning: "Configuration paths exist... do not apply to any resources"
 Normal when you haven't created all models yet. The warning will disappear as you add models.
@@ -178,12 +154,12 @@ Normal when you haven't created all models yet. The warning will disappear as yo
 ### Error: "'dbt_utils' is undefined"
 Install packages first:
 ```bash
-./dbt.bat deps
+dbt deps
 ```
 
 ## Documentation
 
-- [Project Docs (Generated)](http://localhost:8080) - Run `./dbt.bat docs serve`
+- [Project Docs (Generated)](http://localhost:8080) - Run `dbt docs serve`
 - [DBT Core Docs](https://docs.getdbt.com/)
 - [DuckDB Adapter Docs](https://docs.getdbt.com/reference/warehouse-setups/duckdb-setup)
 
@@ -193,14 +169,14 @@ Install packages first:
 
 ```bash
 # All tests
-./dbt.bat test
+dbt test
 
 # Specific model
-./dbt.bat test --select tru_product
+dbt test --select tru_product
 
 # Specific test type
-./dbt.bat test --select test_type:unique
-./dbt.bat test --select test_type:not_null
+dbt test --select test_type:unique
+dbt test --select test_type:not_null
 ```
 
 ### Test Coverage

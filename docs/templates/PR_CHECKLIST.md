@@ -53,10 +53,10 @@ Relates to #<issue_number>
 - [ ] No new warnings or errors
 
 ### DBT Models
-- [ ] `./dbt.bat parse` passes
-- [ ] `./dbt.bat compile --select <model>` successful
-- [ ] `./dbt.bat test --select <model>` all tests pass
-- [ ] `./dbt.bat run --select <model>` materializes correctly
+- [ ] `dbt parse` passes
+- [ ] `dbt compile --select <model>` successful
+- [ ] `dbt test --select <model>` all tests pass
+- [ ] `dbt run --select <model>` materializes correctly
 
 ### Code Quality
 - [ ] sqlfluff lint passes (`sqlfluff lint models/`)
@@ -203,7 +203,7 @@ Closes #42
 
 ## Testing
 - [x] Unit tests pass
-- [x] `./dbt.bat test` passes (5/5 tests)
+- [x] `dbt test` passes (5/5 tests)
 - [x] Manual scrape successful (8K products)
 - [x] sqlfluff lint clean
 

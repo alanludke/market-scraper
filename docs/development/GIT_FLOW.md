@@ -106,13 +106,13 @@ Before submitting a Pull Request, ensure:
 cd src/transform/dbt_project
 
 # Parse and validate SQL
-PYTHONUTF8=1 dbt parse
+dbt parse
 
 # Compile models
-PYTHONUTF8=1 dbt compile
+dbt compile
 
 # Run data tests
-PYTHONUTF8=1 dbt test
+dbt test
 
 # Lint SQL (optional, recommended)
 sqlfluff lint models/

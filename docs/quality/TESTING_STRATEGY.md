@@ -442,16 +442,16 @@ Before merging a PR with new models:
 cd src/transform/dbt_project
 
 # Run all tests
-PYTHONUTF8=1 dbt test
+dbt test
 
 # Run tests for specific model
-PYTHONUTF8=1 dbt test --select tru_product
+dbt test --select tru_product
 
 # Run tests for specific tag
-PYTHONUTF8=1 dbt test --select tag:pricing
+dbt test --select tag:pricing
 
 # Run only failed tests
-PYTHONUTF8=1 dbt test --select result:fail
+dbt test --select result:fail
 ```
 
 ---

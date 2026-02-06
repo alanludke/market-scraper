@@ -176,7 +176,7 @@ data/bronze/
 ```bash
 # Run DBT transformations
 cd src/transform/dbt_project
-./dbt.bat run
+dbt run
 
 # What happens:
 # 1. DBT reads bronze Parquet files (external sources)
