@@ -74,7 +74,7 @@ SELECT
     MAX(price) as highest_price,
     ROUND(MAX(price) - MIN(price), 2) as price_spread,
     ROUND(((MAX(price) - MIN(price)) / NULLIF(MIN(price), 0)) * 100, 1) as price_spread_pct,
-    STRING_AGG(DISTINCT store_name, ', ' ORDER BY store_name) as stores
+    LIST(DISTINCT store_name) as stores
 FROM product_stores
 GROUP BY product_name, ean
 HAVING COUNT(DISTINCT store_name) >= {min_products}
@@ -87,6 +87,8 @@ if not multi_store.empty:
     multi_store['lowest_price'] = multi_store['lowest_price'].apply(lambda x: f"R$ {x:.2f}")
     multi_store['highest_price'] = multi_store['highest_price'].apply(lambda x: f"R$ {x:.2f}")
     multi_store['price_spread'] = multi_store['price_spread'].apply(lambda x: f"R$ {x:.2f}")
+    # Format stores list to string
+    multi_store['stores'] = multi_store['stores'].apply(lambda x: ', '.join(sorted(x)) if isinstance(x, list) else str(x))
 
     st.dataframe(
         multi_store.rename(columns={
