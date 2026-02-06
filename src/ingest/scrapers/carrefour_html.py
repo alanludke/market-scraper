@@ -91,6 +91,125 @@ class CarrefourHTMLScraper(BaseScraper):
         logger.info(f"[{self.store_name}] Discovered {len(discovered)} product URLs")
         return discovered
 
+    def discover_products_incremental(
+        self,
+        days_back: int = 7,
+        limit: Optional[int] = None
+    ) -> List[str]:
+        """
+        Discover only recently modified products using sitemap lastmod.
+
+        This method filters products based on their last modification date,
+        significantly reducing scrape time for daily/weekly incremental updates.
+
+        Args:
+            days_back: Only include products modified in last N days (default: 7)
+            limit: Max products to return (optional)
+
+        Returns:
+            List of product URLs modified in the specified timeframe
+
+        Example:
+            # Daily incremental: last 1 day
+            urls = scraper.discover_products_incremental(days_back=1)
+
+            # Weekly incremental: last 7 days
+            urls = scraper.discover_products_incremental(days_back=7)
+        """
+        from datetime import datetime, timedelta
+
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+        logger.info(
+            f"[{self.store_name}] Discovering products modified since "
+            f"{cutoff_date.strftime('%Y-%m-%d')} ({days_back} days back)"
+        )
+
+        discovered = []
+        idx = self.sitemap_start_index
+        total_checked = 0
+        skipped_old = 0
+
+        while True:
+            if limit and len(discovered) >= limit:
+                discovered = discovered[:limit]
+                break
+
+            url = f"{self.base_url}{self.sitemap_pattern.replace('{n}', str(idx))}"
+            try:
+                resp = self.session.get(url, timeout=20)
+
+                if resp.status_code != 200:
+                    if idx == self.sitemap_start_index:
+                        raise Exception(f"First sitemap not found: {url}")
+                    # Reached end of sitemaps
+                    break
+
+                # Parse sitemap XML
+                root = ET.fromstring(resp.content)
+                ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+                count_before = len(discovered)
+
+                # Iterate over <url> elements (not just <loc>)
+                for url_elem in root.findall(".//s:url", ns):
+                    loc = url_elem.find("s:loc", ns)
+                    lastmod = url_elem.find("s:lastmod", ns)
+
+                    if loc is not None and "/p" in loc.text:
+                        total_checked += 1
+                        product_url = loc.text
+
+                        # Check lastmod date
+                        include_product = False
+
+                        if lastmod is not None and lastmod.text:
+                            try:
+                                # Parse lastmod (format: 2026-02-05 or 2026-02-05T10:30:00)
+                                mod_date_str = lastmod.text.split('T')[0]
+                                mod_date = datetime.strptime(mod_date_str, '%Y-%m-%d')
+
+                                if mod_date >= cutoff_date:
+                                    include_product = True
+                                else:
+                                    skipped_old += 1
+                            except ValueError as e:
+                                # Invalid date format, include it to be safe
+                                logger.debug(f"Invalid lastmod format: {lastmod.text}")
+                                include_product = True
+                        else:
+                            # No lastmod tag, include it (safer to not skip)
+                            include_product = True
+
+                        if include_product:
+                            discovered.append(product_url)
+
+                            if limit and len(discovered) >= limit:
+                                break
+
+                new_count = len(discovered) - count_before
+                logger.info(
+                    f"  sitemap-{idx}: +{new_count} recent "
+                    f"(total: {len(discovered)}, skipped: {skipped_old})"
+                )
+                idx += 1
+
+            except ET.ParseError as e:
+                if idx == self.sitemap_start_index:
+                    raise Exception(f"Sitemap XML parse error: {e}")
+                break
+            except Exception as e:
+                if idx == self.sitemap_start_index:
+                    raise Exception(f"Failed to fetch sitemap: {e}")
+                logger.debug(f"Sitemap discovery ended at index {idx}: {e}")
+                break
+
+        logger.info(
+            f"[{self.store_name}] Incremental discovery complete: "
+            f"{len(discovered)} recent products (checked {total_checked}, "
+            f"skipped {skipped_old} old)"
+        )
+
+        return discovered
+
     def scrape_product_page(self, url: str) -> Optional[Dict[str, Any]]:
         """
         Scrape a single product page and extract JSON-LD data.
