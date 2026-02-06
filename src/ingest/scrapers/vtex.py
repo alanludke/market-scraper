@@ -312,7 +312,8 @@ class VTEXScraper(BaseScraper):
         logger.info(f"[{self.store_name}] Discovering via sitemap...")
         self.session.cookies.clear()
         discovered = set()
-        idx = 0
+        start_idx = self.config.get("sitemap_start_index", 0)
+        idx = start_idx
         pattern = self.config.get("sitemap_pattern", "/sitemap/product-{n}.xml")
 
         while True:
@@ -322,7 +323,7 @@ class VTEXScraper(BaseScraper):
 
                 if resp.status_code != 200:
                     # If first sitemap returns non-200, sitemap doesn't exist
-                    if idx == 0:
+                    if idx == start_idx:
                         raise SitemapNotAvailableError(
                             f"Sitemap not found: {url} returned {resp.status_code}"
                         )
@@ -346,13 +347,13 @@ class VTEXScraper(BaseScraper):
                 raise
             except ET.ParseError as e:
                 # XML parse error - sitemap exists but malformed
-                if idx == 0:
+                if idx == start_idx:
                     raise SitemapNotAvailableError(f"Sitemap XML parse error: {e}")
                 # Otherwise, we've reached the end
                 break
             except Exception as e:
                 # Network error or other issue
-                if idx == 0:
+                if idx == start_idx:
                     raise SitemapNotAvailableError(f"Failed to fetch sitemap: {e}")
                 logger.debug(f"Sitemap discovery ended at index {idx}: {e}")
                 break
