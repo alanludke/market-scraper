@@ -154,15 +154,17 @@ class BaseScraper:
         Consolidate batch Parquet files into a single file.
 
         Changed from JSONL to Parquet consolidation.
+        Batch files are deleted after successful consolidation to save space.
         """
         # Convert final_file extension from .jsonl to .parquet
         parquet_file = final_file.with_suffix(".parquet")
 
-        # Consolidate all batch Parquet files
+        # Consolidate all batch Parquet files (deletes batches after consolidation)
         count = consolidate_parquet_files(
             input_dir=batches_dir,
             output_file=parquet_file,
-            pattern="*.parquet"
+            pattern="*.parquet",
+            delete_batches=True  # Clean up intermediate files
         )
 
         return count

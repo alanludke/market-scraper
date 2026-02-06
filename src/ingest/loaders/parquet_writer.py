@@ -75,7 +75,8 @@ def write_parquet(
 def consolidate_parquet_files(
     input_dir: Path,
     output_file: Path,
-    pattern: str = "*.parquet"
+    pattern: str = "*.parquet",
+    delete_batches: bool = True
 ) -> int:
     """
     Consolidate multiple Parquet batch files into a single file.
@@ -84,6 +85,7 @@ def consolidate_parquet_files(
         input_dir: Directory containing batch Parquet files
         output_file: Output consolidated Parquet file
         pattern: Glob pattern for batch files
+        delete_batches: If True, delete batch files after successful consolidation
 
     Returns:
         Total number of records consolidated
@@ -120,4 +122,22 @@ def consolidate_parquet_files(
     )
 
     logger.info(f"Consolidated {len(dfs)} files -> {output_file.name} ({len(consolidated)} records)")
+
+    # Delete batch files after successful consolidation
+    if delete_batches:
+        for batch_file in batch_files:
+            try:
+                batch_file.unlink()
+                logger.debug(f"Deleted batch file: {batch_file.name}")
+            except Exception as e:
+                logger.warning(f"Failed to delete {batch_file.name}: {e}")
+
+        # Also delete the batches directory if empty
+        try:
+            if input_dir.exists() and not any(input_dir.iterdir()):
+                input_dir.rmdir()
+                logger.debug(f"Deleted empty batches directory: {input_dir}")
+        except Exception as e:
+            logger.debug(f"Could not delete batches dir: {e}")
+
     return len(consolidated)
