@@ -93,7 +93,7 @@ with col1:
         text='penetration_pct'
     )
     fig_penetration.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
-    st.plotly_chart(fig_penetration, use_container_width=True)
+    st.plotly_chart(fig_penetration, width='stretch')
 
 with col2:
     fig_discount = px.bar(
@@ -106,7 +106,7 @@ with col2:
         text='avg_discount'
     )
     fig_discount.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
-    st.plotly_chart(fig_discount, use_container_width=True)
+    st.plotly_chart(fig_discount, width='stretch')
 
 # Hot Deals (>30% discount)
 st.markdown("---")
@@ -193,7 +193,7 @@ fig_discount_dist = px.pie(
     values='product_count',
     title="Distribuição de Produtos por Tipo de Promoção"
 )
-st.plotly_chart(fig_discount_dist, use_container_width=True)
+st.plotly_chart(fig_discount_dist, width='stretch')
 
 # Top Brands on Promotion
 st.markdown("---")
@@ -225,7 +225,7 @@ fig_brands = px.bar(
     text='products_on_promo'
 )
 fig_brands.update_layout(xaxis_tickangle=-45)
-st.plotly_chart(fig_brands, use_container_width=True)
+st.plotly_chart(fig_brands, width='stretch')
 
 # Summary metrics
 st.markdown("---")

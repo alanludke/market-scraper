@@ -105,7 +105,7 @@ if not multi_store.empty:
             'price_spread_pct': 'Diferença (%)',
             'stores': 'Disponível em'
         }),
-        use_container_width=True,
+        width='stretch',
         height=400
     )
 else:
@@ -167,7 +167,7 @@ with col1:
         )
         fig_wins.update_traces(texttemplate='%{text}%', textposition='outside')
         fig_wins.update_layout(showlegend=False, height=300)
-        st.plotly_chart(fig_wins, use_container_width=True)
+        st.plotly_chart(fig_wins, width='stretch')
     else:
         st.info("Sem dados disponíveis")
 
@@ -201,7 +201,7 @@ with col2:
         )
         fig_avg.update_traces(texttemplate='R$ %{text:.2f}', textposition='outside')
         fig_avg.update_layout(showlegend=False, height=300)
-        st.plotly_chart(fig_avg, use_container_width=True)
+        st.plotly_chart(fig_avg, width='stretch')
     else:
         st.info("Sem dados disponíveis")
 
@@ -281,7 +281,7 @@ if not top_gaps.empty:
         showlegend=True
     )
 
-    st.plotly_chart(fig_opp, use_container_width=True)
+    st.plotly_chart(fig_opp, width='stretch')
 else:
     st.info("Sem dados disponíveis")
 

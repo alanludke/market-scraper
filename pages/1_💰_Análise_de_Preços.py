@@ -77,31 +77,34 @@ st.subheader("📊 Indicadores-Chave de Preços (KPIs)")
 kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
 # KPI 1: Average Price
-avg_price = conn.execute(f"""
+result = conn.execute(f"""
 SELECT ROUND(AVG(p.min_price), 2) as avg_price
 FROM dev_local.tru_product p
 JOIN dev_local.dim_store s ON p.supermarket = s.store_id
 LEFT JOIN dev_local.dim_brand b ON p.brand = b.brand_name
 WHERE p.min_price > 0 {date_filter} {store_filter} {brand_filter} {price_filter}
-""").fetchone()[0]
+""").fetchone()
+avg_price = result[0] if result and result[0] is not None else 0
 
 # KPI 2: Price Volatility
-volatility = conn.execute(f"""
+result = conn.execute(f"""
 SELECT ROUND(STDDEV(p.min_price), 2) as volatility
 FROM dev_local.tru_product p
 JOIN dev_local.dim_store s ON p.supermarket = s.store_id
 LEFT JOIN dev_local.dim_brand b ON p.brand = b.brand_name
 WHERE p.min_price > 0 {date_filter} {store_filter} {brand_filter} {price_filter}
-""").fetchone()[0]
+""").fetchone()
+volatility = result[0] if result and result[0] is not None else 0
 
 # KPI 3: Product Count
-product_count = conn.execute(f"""
+result = conn.execute(f"""
 SELECT COUNT(DISTINCT p.product_id) as count
 FROM dev_local.tru_product p
 JOIN dev_local.dim_store s ON p.supermarket = s.store_id
 LEFT JOIN dev_local.dim_brand b ON p.brand = b.brand_name
 WHERE p.min_price > 0 {date_filter} {store_filter} {brand_filter} {price_filter}
-""").fetchone()[0]
+""").fetchone()
+product_count = result[0] if result and result[0] is not None else 0
 
 # KPI 4: Price Change Rate (last 7 days)
 price_change = conn.execute(f"""
@@ -166,7 +169,7 @@ if not price_evolution.empty:
         hover_data=['product_count']
     )
     fig_evolution.update_layout(height=400, hovermode='x unified')
-    st.plotly_chart(fig_evolution, use_container_width=True)
+    st.plotly_chart(fig_evolution, width='stretch')
 else:
     st.info("Sem dados de evolução temporal disponíveis")
 
@@ -200,7 +203,7 @@ with col1:
             points='outliers'
         )
         fig_box.update_layout(height=400, showlegend=False)
-        st.plotly_chart(fig_box, use_container_width=True)
+        st.plotly_chart(fig_box, width='stretch')
     else:
         st.info("Sem dados disponíveis")
 
@@ -250,7 +253,7 @@ with col2:
         fig_index.update_traces(texttemplate='%{text:+.1f}%', textposition='outside')
         fig_index.update_layout(height=400, showlegend=False)
         fig_index.add_vline(x=0, line_dash="dash", line_color="gray")
-        st.plotly_chart(fig_index, use_container_width=True)
+        st.plotly_chart(fig_index, width='stretch')
     else:
         st.info("Sem dados disponíveis")
 
@@ -283,7 +286,7 @@ with tab1:
                 'price': 'Preço (R$)',
                 'brand_name': 'Marca'
             }),
-            use_container_width=True,
+            width='stretch',
             height=400
         )
 
@@ -320,7 +323,7 @@ with tab2:
                 'price': 'Preço (R$)',
                 'brand_name': 'Marca'
             }),
-            use_container_width=True,
+            width='stretch',
             height=400
         )
 
@@ -347,7 +350,7 @@ with tab3:
                 'price': 'Preço (R$)',
                 'brand_name': 'Marca'
             }),
-            use_container_width=True,
+            width='stretch',
             height=400
         )
 
