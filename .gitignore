@@ -1,6 +1,7 @@
 # Data (large, stored in Azure Blob)
 data/
 !data/archive/  # Archive is tracked (legacy reference data)
+!data/analytics.duckdb  # Analytics DB tracked via Git LFS for Streamlit
 
 # Legacy code and corrupted data (archived for reference)
 archive/
@@ -8,6 +9,7 @@ archive/
 # DuckDB
 *.duckdb
 *.duckdb.wal
+!data/analytics.duckdb  # Exception: Track via LFS
 duckdb_tmp/
 
 # Reports (regeneratable)
