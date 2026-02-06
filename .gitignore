@@ -12,8 +12,12 @@ archive/
 !data/analytics.duckdb  # Exception: Track via LFS
 duckdb_tmp/
 
+# Logs (auto-generated)
+logs/
+
 # Reports (regeneratable)
 *.xlsx
+reports/
 
 # Environment & secrets
 .env
