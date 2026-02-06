@@ -1,0 +1,267 @@
+"""
+Carrefour HTML Scraper.
+
+Carrefour blocks VTEX API access (returns 503), so we scrape product pages directly.
+Uses sitemap for discovery, then fetches HTML pages and parses JSON-LD structured data.
+"""
+
+import json
+import time
+import xml.etree.ElementTree as ET
+from typing import List, Dict, Any, Optional
+from pathlib import Path
+from loguru import logger
+from bs4 import BeautifulSoup
+import pandas as pd
+from pydantic import ValidationError
+
+from .base import BaseScraper
+from src.schemas.vtex import VTEXProduct
+from src.observability.metrics import get_metrics_collector
+
+
+class CarrefourHTMLScraper(BaseScraper):
+    """
+    HTML-based scraper for Carrefour (VTEX platform with blocked API).
+
+    Discovery: Sitemaps (same as VTEX)
+    Scraping: Direct HTML parsing with JSON-LD extraction
+    """
+
+    def __init__(self, store_name: str, config: dict):
+        super().__init__(store_name, config)
+        self.sitemap_pattern = config.get("sitemap_pattern", "/sitemap/product-{n}.xml")
+        self.sitemap_start_index = config.get("sitemap_start_index", 0)
+        self.validation_errors_count = 0
+
+    def discover_products(self, limit: Optional[int] = None) -> List[str]:
+        """
+        Discover product URLs from sitemaps.
+
+        Returns:
+            List of product URLs (not IDs, since we scrape HTML)
+        """
+        logger.info(f"[{self.store_name}] Discovering products from sitemap...")
+        discovered = []
+        idx = self.sitemap_start_index
+
+        while True:
+            if limit and len(discovered) >= limit:
+                discovered = discovered[:limit]
+                break
+
+            url = f"{self.base_url}{self.sitemap_pattern.replace('{n}', str(idx))}"
+            try:
+                resp = self.session.get(url, timeout=20)
+
+                if resp.status_code != 200:
+                    if idx == self.sitemap_start_index:
+                        raise Exception(f"First sitemap not found: {url}")
+                    # Reached end of sitemaps
+                    break
+
+                # Parse sitemap XML
+                root = ET.fromstring(resp.content)
+                ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+                count_before = len(discovered)
+
+                for loc in root.findall(".//s:loc", ns):
+                    product_url = loc.text
+                    if "/p" in product_url:  # Filter only product URLs
+                        discovered.append(product_url)
+                        if limit and len(discovered) >= limit:
+                            break
+
+                logger.info(
+                    f"  sitemap-{idx}: +{len(discovered) - count_before} "
+                    f"(total: {len(discovered)})"
+                )
+                idx += 1
+
+            except ET.ParseError as e:
+                if idx == self.sitemap_start_index:
+                    raise Exception(f"Sitemap XML parse error: {e}")
+                break
+            except Exception as e:
+                if idx == self.sitemap_start_index:
+                    raise Exception(f"Failed to fetch sitemap: {e}")
+                logger.debug(f"Sitemap discovery ended at index {idx}: {e}")
+                break
+
+        logger.info(f"[{self.store_name}] Discovered {len(discovered)} product URLs")
+        return discovered
+
+    def scrape_product_page(self, url: str) -> Optional[Dict[str, Any]]:
+        """
+        Scrape a single product page and extract JSON-LD data.
+
+        Returns:
+            Product dict compatible with VTEXProduct schema, or None if failed
+        """
+        try:
+            resp = self.session.get(url, timeout=15)
+            if resp.status_code != 200:
+                logger.warning(f"Failed to fetch {url}: HTTP {resp.status_code}")
+                return None
+
+            # Parse HTML
+            soup = BeautifulSoup(resp.content, 'html.parser')
+
+            # Find JSON-LD structured data
+            script = soup.find('script', type='application/ld+json')
+            if not script or not script.string:
+                logger.warning(f"No JSON-LD found in {url}")
+                return None
+
+            data = json.loads(script.string)
+            if data.get('@type') != 'Product':
+                logger.warning(f"JSON-LD is not a Product: {url}")
+                return None
+
+            # Extract product data
+            offer = data.get('offers', {})
+
+            # Parse product ID from URL (format: /product-name-{id}/p)
+            product_id = url.rstrip('/p').split('-')[-1]
+            if not product_id.isdigit():
+                # Alternative: use SKU
+                product_id = str(data.get('sku', '0'))
+
+            # Build VTEX-compatible product dict
+            product = {
+                'productId': product_id,
+                'productName': data.get('name', ''),
+                'brand': data.get('brand', {}).get('name', '') if isinstance(data.get('brand'), dict) else str(data.get('brand', '')),
+                'linkText': url.split('/')[-2] if '/' in url else '',
+                'productReference': data.get('mpn', ''),
+                'categoryId': None,  # Not available in JSON-LD
+                'categories': [data.get('category', '')] if data.get('category') else [],
+                'link': url,
+                'description': data.get('description', ''),
+                'items': [{
+                    'itemId': product_id,
+                    'name': data.get('name', ''),
+                    'ean': data.get('gtin', ''),
+                    'variations': [],
+                    'sellers': [{
+                        'sellerId': '1',
+                        'sellerName': 'Carrefour',
+                        'addToCartLink': '',
+                        'sellerDefault': True,
+                        'commertialOffer': {
+                            'Price': offer.get('price', 0),
+                            'ListPrice': offer.get('price', 0),  # No list price in JSON-LD
+                            'PriceWithoutDiscount': offer.get('price', 0),
+                            'AvailableQuantity': 100 if 'InStock' in offer.get('availability', '') else 0,
+                            'IsAvailable': 'InStock' in offer.get('availability', ''),
+                        }
+                    }],
+                    'images': [
+                        {
+                            'imageId': '1',
+                            'imageUrl': data.get('image', ''),
+                            'imageLabel': '',
+                            'imageText': data.get('name', '')
+                        }
+                    ] if data.get('image') else [],
+                }],
+            }
+
+            return product
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON-LD parse error in {url}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error scraping {url}: {e}")
+            return None
+
+    def scrape_batch(
+        self,
+        product_urls: List[str],
+        region_key: str,
+        batch_number: int,
+        metrics: Any
+    ) -> List[Dict[str, Any]]:
+        """
+        Scrape a batch of product URLs.
+
+        Returns:
+            List of validated product dicts
+        """
+        validated_products = []
+
+        with metrics.track_batch(batch_number, region=region_key) as batch:
+            for url in product_urls:
+                product = self.scrape_product_page(url)
+                if product:
+                    # Validate with Pydantic
+                    try:
+                        validated = VTEXProduct.parse_obj(product)
+                        validated_products.append(validated.dict())
+                    except ValidationError as e:
+                        logger.warning(f"Validation failed for {url}: {e}")
+                        self.validation_errors_count += 1
+
+                time.sleep(self.request_delay)
+
+            batch.products_count = len(validated_products)
+            batch.success = True
+
+        return validated_products
+
+    def scrape_region(self, region_key: str, product_urls: List[str]):
+        """
+        Scrape Carrefour for a specific region using HTML scraping.
+
+        Args:
+            region_key: Region identifier (e.g., 'florianopolis_centro')
+            product_urls: List of product URLs to scrape (from discover_products)
+
+        Note: Region-specific pricing may not work properly without VTEX segment cookies.
+        """
+        logger.info(f"[{self.store_name}/{region_key}] Starting HTML-based scrape")
+
+        if not product_urls:
+            logger.error("No product URLs provided")
+            return
+
+        # Setup output paths
+        base_path = self.get_output_path(region_key)
+        batches_dir = base_path / "batches"
+        batches_dir.mkdir(parents=True, exist_ok=True)
+        final_file = base_path / f"{self.store_name}_{region_key}_full.parquet"
+
+        # Metrics
+        metrics = get_metrics_collector(
+            db_path=f"data/metrics/{self.store_name}_runs.duckdb",
+            store_name=self.store_name
+        )
+
+        # Scrape in batches
+        all_products = []
+        for i in range(0, len(product_urls), self.batch_size):
+            chunk = product_urls[i : i + self.batch_size]
+            batch_number = i // self.batch_size
+
+            logger.info(f"  Batch {batch_number}: {len(chunk)} products")
+            products = self.scrape_batch(chunk, region_key, batch_number, metrics)
+
+            if products:
+                # Save batch
+                batch_file = batches_dir / f"batch_{batch_number:05d}.parquet"
+                self.save_batch(products, batch_file, region_key)
+                all_products.extend(products)
+
+            if i % 500 == 0 and i > 0:
+                logger.info(f"  Progress: {i}/{len(product_urls)}")
+
+        # Consolidate batches
+        self.consolidate_batches(batches_dir, final_file)
+        self.validate_run(region_key, final_file)
+
+        logger.info(
+            f"[{self.store_name}/{region_key}] Scrape complete: "
+            f"{len(all_products)} products, "
+            f"{self.validation_errors_count} validation errors"
+        )
