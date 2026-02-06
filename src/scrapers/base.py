@@ -1,4 +1,12 @@
 """
+DEPRECATED: Use src.ingest.scrapers.base.BaseScraper instead.
+
+This legacy BaseScraper lacks:
+- Structured logging (uses stdlib logging instead of Loguru)
+- Operational metrics tracking (no DuckDB metrics)
+- Parquet output (only JSONL, 35x slower)
+- Proper error handling (silent failures in subclasses)
+
 Base scraper class. All platform-specific scrapers inherit from this.
 
 BaseScraper handles:

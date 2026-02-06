@@ -1,4 +1,21 @@
 """
+DEPRECATED: Use src.ingest.scrapers.vtex.VTEXScraper instead.
+
+This legacy VTEXScraper has critical issues:
+- Line 60: Silent exception swallowing (except Exception: pass)
+- Line 145: Silent sitemap parsing failure (except Exception: break)
+- Line 195: Silent category discovery failure (except Exception: break)
+- No structured logging (stdlib logging, no correlation IDs)
+- No operational metrics tracking
+- JSONL output only (no Parquet)
+
+The new implementation in src.ingest.scrapers.vtex provides:
+- Proper exception handling with Loguru structured logging
+- Operational metrics in DuckDB (runs.duckdb)
+- Parquet output (35x faster queries)
+- Discovery-phase metrics for performance analysis
+- Region-level batch tracking
+
 VTEX Commerce Cloud scraper.
 
 Handles all VTEX-based supermarkets (Bistek, Fort, Giassi, Angeloni, etc.)

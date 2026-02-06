@@ -16,12 +16,14 @@ import re
 import time
 import base64
 import xml.etree.ElementTree as ET
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from pathlib import Path
 from loguru import logger
+from pydantic import ValidationError
 
 from .base import BaseScraper
 from src.observability.metrics import get_metrics_collector
+from src.schemas.vtex import VTEXProduct
 
 
 class RegionResolver:
@@ -85,6 +87,71 @@ class VTEXScraper(BaseScraper):
         self.discovery = config.get("discovery", "category_tree")
         self.global_discovery = config.get("global_discovery", True)
         self.cookie_domain = config.get("cookie_domain", "")
+        self.validation_errors_count = 0  # Track validation failures
+
+    # ── Data Quality (Phase 2) ──────────────────────────────────
+
+    def validate_products(self, products: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Validate products using Pydantic schemas.
+
+        Invalid products are logged and skipped, preventing corrupted data
+        from reaching the bronze layer.
+
+        Args:
+            products: List of product dictionaries from VTEX API
+
+        Returns:
+            List of validated product dictionaries (invalid products removed)
+        """
+        validated = []
+
+        for product in products:
+            try:
+                # Validate using Pydantic
+                validated_product = VTEXProduct.parse_obj(product)
+                # Convert back to dict for downstream processing
+                validated.append(validated_product.dict())
+            except ValidationError as e:
+                # Log validation error with context
+                product_id = product.get('productId', 'unknown')
+                product_name = product.get('productName', 'unknown')
+
+                logger.warning(
+                    f"Product validation failed: {product_id} - {product_name}",
+                    extra={
+                        "product_id": product_id,
+                        "validation_errors": e.errors(),
+                        "store": self.store_name,
+                        "run_id": self.run_id
+                    }
+                )
+
+                self.validation_errors_count += 1
+                # Skip invalid product
+                continue
+            except Exception as e:
+                # Unexpected error during validation
+                logger.error(
+                    f"Unexpected error validating product: {e}",
+                    extra={
+                        "product": product.get('productId', 'unknown'),
+                        "store": self.store_name,
+                        "run_id": self.run_id
+                    }
+                )
+                self.validation_errors_count += 1
+                continue
+
+        # Log summary if any products were invalid
+        if len(validated) < len(products):
+            skipped = len(products) - len(validated)
+            logger.info(
+                f"Validation complete: {len(validated)}/{len(products)} products valid "
+                f"({skipped} skipped due to validation errors)"
+            )
+
+        return validated
 
     # ── Entry point ─────────────────────────────────────────────
 
@@ -98,7 +165,10 @@ class VTEXScraper(BaseScraper):
 
         try:
             if self.global_discovery:
+                # Track discovery phase separately (Phase 1 enhancement)
+                metrics.start_discovery(discovery_mode=self.discovery)
                 product_ids = self.discover_products(limit)
+                metrics.finish_discovery(products_discovered=len(product_ids))
                 logger.info(f"[{self.store_name}] Discovered {len(product_ids)} products")
                 for region_key in targets:
                     if region_key not in self.regions:
@@ -111,7 +181,8 @@ class VTEXScraper(BaseScraper):
                 metrics.finish_run(
                     status="success",
                     products_discovered=len(product_ids),
-                    products_scraped=len(product_ids) * len(targets)
+                    products_scraped=len(product_ids) * len(targets),
+                    validation_errors_count=self.validation_errors_count
                 )
             else:
                 for region_key in targets:
@@ -122,13 +193,20 @@ class VTEXScraper(BaseScraper):
                     self.session.cookies.clear()
 
                 # Success (per-region mode)
-                metrics.finish_run(status="success")
+                metrics.finish_run(
+                    status="success",
+                    validation_errors_count=self.validation_errors_count
+                )
 
             logger.info(f"[{self.store_name}] Run {self.run_id} completed successfully")
 
         except Exception as e:
             logger.exception(f"[{self.store_name}] Run {self.run_id} failed")
-            metrics.finish_run(status="failed", error_message=str(e))
+            metrics.finish_run(
+                status="failed",
+                error_message=str(e),
+                validation_errors_count=self.validation_errors_count
+            )
             raise
 
     # ── Discovery ───────────────────────────────────────────────
@@ -281,15 +359,17 @@ class VTEXScraper(BaseScraper):
                 "sc": cfg["sc"],
             }
 
-            with metrics.track_batch(batch_number) as batch:
+            with metrics.track_batch(batch_number, region=region_key) as batch:
                 try:
                     resp = self.session.get(api_url, params=params, timeout=20)
                     batch.api_status_code = resp.status_code
                     if resp.status_code in [200, 206]:
                         items = resp.json()
-                        batch.products_count = len(items)
-                        if items:
-                            self.save_batch(items, batch_file, region_key)
+                        # Phase 2: Validate products before saving
+                        validated_items = self.validate_products(items)
+                        batch.products_count = len(validated_items)
+                        if validated_items:
+                            self.save_batch(validated_items, batch_file, region_key)
                 except Exception as e:
                     logger.error(f"Batch {batch_number} error at offset {i}: {e}")
                     batch.success = False
@@ -342,7 +422,7 @@ class VTEXScraper(BaseScraper):
                     "O": "OrderByScoreDESC",
                 }
 
-                with metrics.track_batch(batch_counter) as batch:
+                with metrics.track_batch(batch_counter, region=region_key) as batch:
                     try:
                         resp = self.session.get(api_url, params=params, timeout=20)
                         batch.api_status_code = resp.status_code
@@ -350,23 +430,28 @@ class VTEXScraper(BaseScraper):
                             batch.success = False
                             break
                         items = resp.json()
-                        batch.products_count = len(items)
                         if not items:
+                            break
+
+                        # Phase 2: Validate products before saving
+                        validated_items = self.validate_products(items)
+                        batch.products_count = len(validated_items)
+                        if not validated_items:
                             break
 
                         batch_file = (
                             batches_dir / f"dept_{dept_id}_batch_{start:05d}.parquet"
                         )
                         self.save_batch(
-                            items,
+                            validated_items,
                             batch_file,
                             region_key,
                             extra_metadata={"dept_id": dept_id},
                         )
-                        total_collected += len(items)
+                        total_collected += len(validated_items)
                         start += 50
                         batch_counter += 1
-                        if len(items) < 50:
+                        if len(validated_items) < 50:
                             break
                     except Exception as e:
                         logger.error(f"Error dept {dept_id} offset {start}: {e}")

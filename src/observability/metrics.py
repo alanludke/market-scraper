@@ -37,6 +37,7 @@ class MetricsCollector:
         self.current_store: Optional[str] = None
         self.current_region: Optional[str] = None
         self.run_start_time: Optional[float] = None
+        self.discovery_start_time: Optional[float] = None  # Phase 1 enhancement
 
     def _init_schema(self):
         """Create tables if they don't exist. Thread-safe via global lock."""
@@ -51,11 +52,23 @@ class MetricsCollector:
                         started_at TIMESTAMP NOT NULL,
                         finished_at TIMESTAMP,
                         status VARCHAR NOT NULL,  -- 'running', 'success', 'failed', 'partial'
+
+                        -- Discovery phase metrics (Phase 1 enhancement)
+                        discovery_started_at TIMESTAMP,
+                        discovery_finished_at TIMESTAMP,
+                        discovery_duration_seconds DOUBLE,
+                        discovery_mode VARCHAR,  -- 'sitemap' or 'category_tree'
+
+                        -- Scraping phase metrics
                         products_discovered INTEGER,
                         products_scraped INTEGER,
                         bytes_downloaded BIGINT,
                         api_calls_count INTEGER,
                         api_errors_count INTEGER,
+
+                        -- Data quality metrics (Phase 2 enhancement)
+                        validation_errors_count INTEGER DEFAULT 0,
+
                         duration_seconds DOUBLE,
                         error_message TEXT,
                         output_path VARCHAR
@@ -68,6 +81,7 @@ class MetricsCollector:
                         batch_id VARCHAR PRIMARY KEY,
                         run_id VARCHAR NOT NULL,
                         batch_number INTEGER,
+                        region VARCHAR,  -- Phase 1 enhancement: track region per batch
                         started_at TIMESTAMP,
                         finished_at TIMESTAMP,
                         products_count INTEGER,
@@ -93,6 +107,44 @@ class MetricsCollector:
                     ) VALUES (?, ?, ?, ?, 'running')
                 """, [run_id, store, region, datetime.now()])
 
+    def start_discovery(self, discovery_mode: str):
+        """Mark the start of product discovery phase. Thread-safe."""
+        if not self.current_run_id:
+            raise ValueError("No active run. Call start_run() first.")
+
+        self.discovery_start_time = time.time()
+
+        with _db_lock:
+            with duckdb.connect(str(self.db_path)) as conn:
+                conn.execute("""
+                    UPDATE scraper_runs
+                    SET discovery_started_at = ?,
+                        discovery_mode = ?
+                    WHERE run_id = ?
+                """, [datetime.now(), discovery_mode, self.current_run_id])
+
+    def finish_discovery(self, products_discovered: int):
+        """Mark the end of product discovery phase. Thread-safe."""
+        if not self.current_run_id:
+            raise ValueError("No active run. Call start_run() first.")
+
+        if not self.discovery_start_time:
+            raise ValueError("No active discovery. Call start_discovery() first.")
+
+        duration = time.time() - self.discovery_start_time
+
+        with _db_lock:
+            with duckdb.connect(str(self.db_path)) as conn:
+                conn.execute("""
+                    UPDATE scraper_runs
+                    SET discovery_finished_at = ?,
+                        discovery_duration_seconds = ?,
+                        products_discovered = ?
+                    WHERE run_id = ?
+                """, [datetime.now(), duration, products_discovered, self.current_run_id])
+
+        self.discovery_start_time = None
+
     def finish_run(
         self,
         status: str,
@@ -100,6 +152,7 @@ class MetricsCollector:
         products_scraped: int = None,
         output_path: str = None,
         error_message: str = None,
+        validation_errors_count: int = None,  # Phase 2 enhancement
         **kwargs
     ):
         """Mark the end of a scraper run with final metrics. Thread-safe."""
@@ -118,7 +171,8 @@ class MetricsCollector:
                         products_scraped = ?,
                         duration_seconds = ?,
                         output_path = ?,
-                        error_message = ?
+                        error_message = ?,
+                        validation_errors_count = ?
                     WHERE run_id = ?
                 """, [
                     datetime.now(),
@@ -128,6 +182,7 @@ class MetricsCollector:
                     duration,
                     output_path,
                     error_message,
+                    validation_errors_count,
                     self.current_run_id
                 ])
 
@@ -136,11 +191,13 @@ class MetricsCollector:
         self.current_store = None
         self.current_region = None
         self.run_start_time = None
+        self.discovery_start_time = None
 
     def record_batch(
         self,
         batch_number: int,
         products_count: int,
+        region: str = None,  # Phase 1 enhancement: track region per batch
         api_status_code: int = None,
         response_time_ms: float = None,
         retry_count: int = 0,
@@ -154,19 +211,23 @@ class MetricsCollector:
         timestamp_us = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         batch_id = f"{self.current_run_id}_batch_{batch_number}_{timestamp_us}"
 
+        # Use current_region if region not explicitly provided
+        region_value = region if region is not None else self.current_region
+
         with _db_lock:
             with duckdb.connect(str(self.db_path)) as conn:
                 conn.execute("""
                     INSERT INTO scraper_batches (
-                        batch_id, run_id, batch_number,
+                        batch_id, run_id, batch_number, region,
                         started_at, finished_at,
                         products_count, api_status_code,
                         response_time_ms, retry_count, success
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, [
                     batch_id,
                     self.current_run_id,
                     batch_number,
+                    region_value,
                     datetime.now(),
                     datetime.now(),
                     products_count,
@@ -177,20 +238,21 @@ class MetricsCollector:
                 ])
 
     @contextmanager
-    def track_batch(self, batch_number: int):
+    def track_batch(self, batch_number: int, region: str = None):
         """
         Context manager for tracking batch execution.
 
         Usage:
-            with metrics.track_batch(1) as batch:
+            with metrics.track_batch(1, region="florianopolis") as batch:
                 products = scrape_batch()
                 batch.products_count = len(products)
                 batch.api_status_code = 200
         """
         class BatchContext:
-            def __init__(self, collector, batch_num):
+            def __init__(self, collector, batch_num, region):
                 self.collector = collector
                 self.batch_num = batch_num
+                self.region = region
                 self.products_count = 0
                 self.api_status_code = None
                 self.response_time_ms = None
@@ -198,7 +260,7 @@ class MetricsCollector:
                 self.success = True
                 self.start_time = time.time()
 
-        batch = BatchContext(self, batch_number)
+        batch = BatchContext(self, batch_number, region)
 
         try:
             yield batch
@@ -212,6 +274,7 @@ class MetricsCollector:
 
             self.record_batch(
                 batch_number=batch.batch_num,
+                region=batch.region,
                 products_count=batch.products_count,
                 api_status_code=batch.api_status_code,
                 response_time_ms=batch.response_time_ms,
