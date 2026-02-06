@@ -18,12 +18,19 @@ import base64
 import xml.etree.ElementTree as ET
 from typing import Optional, List, Dict, Any
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from loguru import logger
 from pydantic import ValidationError
 
 from .base import BaseScraper
+from .rate_limiter import get_rate_limiter
 from src.observability.metrics import get_metrics_collector
 from src.schemas.vtex import VTEXProduct
+
+
+class SitemapNotAvailableError(Exception):
+    """Raised when sitemap discovery fails (404, parse error, etc)."""
+    pass
 
 
 class RegionResolver:
@@ -88,6 +95,10 @@ class VTEXScraper(BaseScraper):
         self.global_discovery = config.get("global_discovery", True)
         self.cookie_domain = config.get("cookie_domain", "")
         self.validation_errors_count = 0  # Track validation failures
+
+        # Performance optimization (Phase 3)
+        self.max_workers = config.get("max_workers", 1)  # Parallel regions
+        self.rate_limiter = get_rate_limiter()  # Global VTEX rate limiter
 
     # ── Data Quality (Phase 2) ──────────────────────────────────
 
@@ -157,7 +168,11 @@ class VTEXScraper(BaseScraper):
 
     def run(self, regions: list[str] | None = None, limit: Optional[int] = None):
         targets = regions or list(self.regions.keys())
-        metrics = get_metrics_collector()
+        # Use per-store database for parallel execution (avoids file locking)
+        metrics = get_metrics_collector(
+            db_path="data/metrics/{store}_runs.duckdb",
+            store_name=self.store_name
+        )
 
         # Start metrics tracking
         metrics.start_run(self.run_id, self.store_name, region="all")
@@ -170,12 +185,36 @@ class VTEXScraper(BaseScraper):
                 product_ids = self.discover_products(limit)
                 metrics.finish_discovery(products_discovered=len(product_ids))
                 logger.info(f"[{self.store_name}] Discovered {len(product_ids)} products")
-                for region_key in targets:
-                    if region_key not in self.regions:
-                        logger.warning(f"Region '{region_key}' not in config, skipping")
-                        continue
-                    self._scrape_by_ids(region_key, product_ids)
-                    self.session.cookies.clear()
+
+                # Phase 3 optimization: Parallel region scraping
+                if self.max_workers > 1:
+                    logger.info(f"[{self.store_name}] Scraping {len(targets)} regions in parallel (max_workers={self.max_workers})")
+                    with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                        # Submit all regions to thread pool
+                        futures = {}
+                        for region_key in targets:
+                            if region_key not in self.regions:
+                                logger.warning(f"Region '{region_key}' not in config, skipping")
+                                continue
+                            future = executor.submit(self._scrape_by_ids_parallel, region_key, product_ids)
+                            futures[future] = region_key
+
+                        # Wait for all regions to complete
+                        for future in as_completed(futures):
+                            region_key = futures[future]
+                            try:
+                                future.result()  # Raises exception if scraping failed
+                                logger.info(f"[{self.store_name}/{region_key}] Completed")
+                            except Exception as e:
+                                logger.error(f"[{self.store_name}/{region_key}] Failed: {e}")
+                else:
+                    # Sequential mode (backward compatible)
+                    for region_key in targets:
+                        if region_key not in self.regions:
+                            logger.warning(f"Region '{region_key}' not in config, skipping")
+                            continue
+                        self._scrape_by_ids(region_key, product_ids)
+                        self.session.cookies.clear()
 
                 # Success
                 metrics.finish_run(
@@ -212,11 +251,64 @@ class VTEXScraper(BaseScraper):
     # ── Discovery ───────────────────────────────────────────────
 
     def discover_products(self, limit: Optional[int] = None) -> list[str]:
-        if self.discovery == "sitemap":
-            return self._discover_via_sitemap(limit)
-        return self._discover_via_categories(limit)
+        """
+        Discover product IDs using configured strategy.
+
+        Strategy:
+        - If config specifies "category_tree": Use only category_tree (reliable for stores with stale sitemaps)
+        - If config specifies "sitemap" or unspecified: Try sitemap first (fast path), fallback to category_tree if it fails
+
+        This ensures stores with known stale sitemaps (Fort, Giassi) skip sitemap entirely.
+        """
+        discovery_method = self.config.get("discovery", "sitemap")
+
+        # If config explicitly says category_tree, skip sitemap (e.g., Fort/Giassi have stale sitemaps)
+        if discovery_method == "category_tree":
+            logger.info(f"[{self.store_name}] Using category_tree discovery (config: discovery=category_tree)")
+            product_ids = self._discover_via_categories(limit)
+            logger.info(
+                f"[{self.store_name}] Category tree discovery successful: {len(product_ids)} products",
+                extra={"discovery_method": "category_tree", "products_count": len(product_ids)}
+            )
+            return product_ids
+
+        # Otherwise, try sitemap first (fast path), fallback to category_tree if needed
+        try:
+            logger.info(f"[{self.store_name}] Attempting sitemap discovery (fast path)")
+            product_ids = self._discover_via_sitemap(limit)
+            logger.info(
+                f"[{self.store_name}] Sitemap discovery successful: {len(product_ids)} products",
+                extra={"discovery_method": "sitemap", "products_count": len(product_ids)}
+            )
+            return product_ids
+        except SitemapNotAvailableError as e:
+            # Sitemap not available - fallback to category_tree
+            logger.warning(
+                f"[{self.store_name}] Sitemap not available ({e}), falling back to category_tree",
+                extra={"discovery_method": "category_tree_fallback", "sitemap_error": str(e)}
+            )
+            product_ids = self._discover_via_categories(limit)
+            logger.info(
+                f"[{self.store_name}] Category tree discovery successful: {len(product_ids)} products",
+                extra={"discovery_method": "category_tree", "products_count": len(product_ids)}
+            )
+            return product_ids
+        except Exception as e:
+            # Unexpected error in sitemap - log and try category_tree
+            logger.error(
+                f"[{self.store_name}] Unexpected error in sitemap discovery: {e}, trying category_tree",
+                extra={"discovery_method": "category_tree_fallback", "error": str(e)}
+            )
+            # Try category_tree as last resort
+            return self._discover_via_categories(limit)
 
     def _discover_via_sitemap(self, limit: Optional[int] = None) -> list[str]:
+        """
+        Discover product IDs via sitemap XML files.
+
+        Raises:
+            SitemapNotAvailableError: If sitemap doesn't exist or returns no products
+        """
         logger.info(f"[{self.store_name}] Discovering via sitemap...")
         self.session.cookies.clear()
         discovered = set()
@@ -227,8 +319,16 @@ class VTEXScraper(BaseScraper):
             url = f"{self.base_url}{pattern.replace('{n}', str(idx))}"
             try:
                 resp = self.session.get(url, timeout=20)
+
                 if resp.status_code != 200:
+                    # If first sitemap returns non-200, sitemap doesn't exist
+                    if idx == 0:
+                        raise SitemapNotAvailableError(
+                            f"Sitemap not found: {url} returned {resp.status_code}"
+                        )
+                    # Otherwise, we've reached the end of sitemaps (normal)
                     break
+
                 root = ET.fromstring(resp.content)
                 ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
                 count_before = len(discovered)
@@ -241,9 +341,25 @@ class VTEXScraper(BaseScraper):
                     f"(total: {len(discovered)})"
                 )
                 idx += 1
+            except SitemapNotAvailableError:
+                # Re-raise sitemap not available
+                raise
+            except ET.ParseError as e:
+                # XML parse error - sitemap exists but malformed
+                if idx == 0:
+                    raise SitemapNotAvailableError(f"Sitemap XML parse error: {e}")
+                # Otherwise, we've reached the end
+                break
             except Exception as e:
+                # Network error or other issue
+                if idx == 0:
+                    raise SitemapNotAvailableError(f"Failed to fetch sitemap: {e}")
                 logger.debug(f"Sitemap discovery ended at index {idx}: {e}")
                 break
+
+        # If we discovered 0 products, sitemap is either empty or doesn't exist properly
+        if len(discovered) == 0:
+            raise SitemapNotAvailableError("Sitemap returned 0 products")
 
         result = list(discovered)
         return result[:limit] if limit else result
@@ -345,7 +461,11 @@ class VTEXScraper(BaseScraper):
         final_file = base_path / f"{self.store_name}_{region_key}_full.parquet"
         api_url = f"{self.base_url}/api/catalog_system/pub/products/search"
 
-        metrics = get_metrics_collector()
+        # Use per-store database for parallel execution
+        metrics = get_metrics_collector(
+            db_path="data/metrics/{store}_runs.duckdb",
+            store_name=self.store_name
+        )
 
         for i in range(0, len(product_ids), self.batch_size):
             chunk = product_ids[i : i + self.batch_size]
@@ -370,6 +490,9 @@ class VTEXScraper(BaseScraper):
                         batch.products_count = len(validated_items)
                         if validated_items:
                             self.save_batch(validated_items, batch_file, region_key)
+                    else:
+                        logger.warning(f"[{region_key}] API returned status {resp.status_code} for batch {batch_number}")
+                        batch.success = False
                 except Exception as e:
                     logger.error(f"Batch {batch_number} error at offset {i}: {e}")
                     batch.success = False
@@ -377,6 +500,93 @@ class VTEXScraper(BaseScraper):
             if i % 500 == 0 and i > 0:
                 logger.info(f"  progress: {i}/{len(product_ids)}")
             time.sleep(self.request_delay)
+
+        self.consolidate_batches(batches_dir, final_file)
+        self.validate_run(region_key, final_file)
+
+    def _scrape_by_ids_parallel(self, region_key: str, product_ids: list[str]):
+        """
+        Thread-safe version of _scrape_by_ids for parallel execution.
+
+        Each thread gets its own session to avoid race conditions.
+        Uses global rate limiter to respect VTEX API limits.
+        """
+        import requests  # Import here for thread-local session
+
+        cfg = self.regions[region_key]
+        logger.info(
+            f"[{self.store_name}/{region_key}] Scraping {len(product_ids)} products "
+            f"(CEP={cfg['cep']}, SC={cfg['sc']}) [PARALLEL]"
+        )
+
+        # Create thread-local session
+        session = requests.Session()
+        session.headers.update(self.session.headers)  # Copy headers from main session
+
+        # Set region cookie
+        resolver = RegionResolver(session, self.base_url)
+        cookie = resolver.get_segment_cookie(cfg["cep"], cfg["sc"], cfg.get("hub_id"))
+        if not cookie:
+            logger.error(f"Failed to build cookie for {region_key}")
+            return
+
+        if self.cookie_domain:
+            session.cookies.set("vtex_segment", cookie, domain=self.cookie_domain)
+        else:
+            session.cookies.set("vtex_segment", cookie)
+
+        base_path = self.get_output_path(region_key)
+        batches_dir = base_path / "batches"
+        batches_dir.mkdir(parents=True, exist_ok=True)
+        final_file = base_path / f"{self.store_name}_{region_key}_full.parquet"
+        api_url = f"{self.base_url}/api/catalog_system/pub/products/search"
+
+        # Use per-store database for parallel execution
+        metrics = get_metrics_collector(
+            db_path="data/metrics/{store}_runs.duckdb",
+            store_name=self.store_name
+        )
+
+        for i in range(0, len(product_ids), self.batch_size):
+            chunk = product_ids[i : i + self.batch_size]
+            batch_file = batches_dir / f"batch_{i // self.batch_size:05d}.parquet"
+            batch_number = i // self.batch_size
+            fq = ",".join(f"productId:{pid}" for pid in chunk)
+            params = {
+                "fq": fq,
+                "_from": 0,
+                "_to": len(chunk) - 1,
+                "sc": cfg["sc"],
+            }
+
+            with metrics.track_batch(batch_number, region=region_key) as batch:
+                # Use rate limiter to respect VTEX API limits
+                with self.rate_limiter.limit():
+                    try:
+                        resp = session.get(api_url, params=params, timeout=20)
+                        batch.api_status_code = resp.status_code
+                        if resp.status_code in [200, 206]:
+                            items = resp.json()
+                            # Phase 2: Validate products before saving
+                            validated_items = self.validate_products(items)
+                            batch.products_count = len(validated_items)
+                            if validated_items:
+                                self.save_batch(validated_items, batch_file, region_key)
+                            elif len(items) > 0:
+                                # Log warning only if API returned products but all failed validation
+                                logger.warning(f"[{region_key}] All {len(items)} products in batch {batch_number} failed validation")
+                        else:
+                            logger.warning(f"[{region_key}] API returned status {resp.status_code} for batch {batch_number}")
+                            batch.success = False
+                    except Exception as e:
+                        logger.error(f"Batch {batch_number} error at offset {i}: {e}")
+                        batch.success = False
+
+            if i % 500 == 0 and i > 0:
+                logger.info(f"  [{region_key}] progress: {i}/{len(product_ids)}")
+
+        # Close thread-local session
+        session.close()
 
         self.consolidate_batches(batches_dir, final_file)
         self.validate_run(region_key, final_file)

@@ -19,12 +19,16 @@ def setup_logging(run_id: str = None, store: str = None, region: str = None, ver
 
     Args:
         run_id: Unique run identifier for correlation
-        store: Store name (bistek, fort, giassi)
+        store: Store name (bistek, fort, giassi) - creates per-store log file for parallel execution
         region: Region key
         verbose: If True, set console level to DEBUG
 
     Returns:
         Configured logger with context bindings
+
+    Note:
+        Using per-store log files (e.g., bistek.log, fort.log) instead of a shared app.log
+        prevents file rotation conflicts when running multiple scrapers in parallel.
     """
     # Remove default handler
     logger.remove()
@@ -42,8 +46,11 @@ def setup_logging(run_id: str = None, store: str = None, region: str = None, ver
     log_dir = Path("data/logs")
     log_dir.mkdir(parents=True, exist_ok=True)
 
+    # Use per-store log file for parallel execution (avoids rotation conflicts)
+    log_file = f"{store}.log" if store else "app.log"
+
     logger.add(
-        log_dir / "app.log",
+        log_dir / log_file,
         level="DEBUG",
         format="{time} {level} {message}",
         rotation="10 MB",          # Rotate when file reaches 10MB

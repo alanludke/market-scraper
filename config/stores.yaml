@@ -18,7 +18,8 @@ stores:
     sitemap_pattern: "/sitemap/product-{n}.xml"
     global_discovery: true
     batch_size: 50
-    request_delay: 0.3
+    request_delay: 0.1             # Optimized: was 0.3s (3x faster!)
+    max_workers: 13                # Parallel regions (NEW: 13 regions in parallel!)
     regions:
       florianopolis_costeira:
         cep: "88047-010"
@@ -74,17 +75,18 @@ stores:
         hub_id: "v2.D64E8C3CDDA81BB086AFE28286D484E6"
 
   # --------------------------------------------------------------------------
-  # FORT ATACADISTA - Discovery via category tree, scrape per batch of IDs
+  # FORT ATACADISTA - Discovery via sitemap (8 product sitemap files)
   # --------------------------------------------------------------------------
   fort:
     platform: vtex
     base_url: "https://www.deliveryfort.com.br"
     cookie_domain: ".deliveryfort.com.br"
-    discovery: category_tree
+    discovery: category_tree               # Note: sitemap exists but returns products unavailable in all sales channels
+    sitemap_pattern: "/sitemap/product-{n}.xml"
     global_discovery: true
-    discovery_region: balneario_camboriu   # reference region for discovery
     batch_size: 50
-    request_delay: 0.1
+    request_delay: 0.1                     # Optimized: 3x faster than 0.3s
+    max_workers: 7                         # Parallel regions (7 regions)
     regions:
       # Independent stores (no manual hub)
       balneario_camboriu:
@@ -118,16 +120,18 @@ stores:
         hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
 
   # --------------------------------------------------------------------------
-  # GIASSI - Discovery via category tree, scrape per department PER REGION
+  # GIASSI - Discovery via sitemap (13 product sitemap files)
   # --------------------------------------------------------------------------
   giassi:
     platform: vtex
     base_url: "https://www.giassi.com.br"
     cookie_domain: ".giassi.com.br"
-    discovery: category_tree
-    global_discovery: false    # iterates departments per region (no global discovery)
+    discovery: category_tree               # Note: sitemap exists but returns products unavailable in all sales channels
+    sitemap_pattern: "/sitemap/product-{n}.xml"
+    global_discovery: true
     batch_size: 50
-    request_delay: 0.2
+    request_delay: 0.1                     # Optimized: was 0.2s (2x faster!)
+    max_workers: 17                        # Parallel regions (17 regions)
     regions:
       # Stores without manual hub (automatic fallback via API)
       florianopolis_santa_monica:

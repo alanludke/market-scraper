@@ -116,7 +116,7 @@ with
             , list(distinct ean) filter (where ean is not null) as eans
 
             -- Availability
-            , sum(available_quantity) as total_available_quantity
+            , cast(sum(available_quantity) as bigint) as total_available_quantity
             , bool_or(available_quantity > 0) as is_available
 
             -- Metadata
@@ -158,7 +158,7 @@ with
             , run_id
             , scraped_date
             , scraped_at
-            , current_timestamp() as loaded_at
+            , cast(current_timestamp as timestamp) as loaded_at
 
         from aggregate_product
     )

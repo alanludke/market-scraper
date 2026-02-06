@@ -72,7 +72,11 @@ class BaseScraper:
     def run(self, regions: list[str] | None = None, limit: Optional[int] = None):
         """Main entry point. Override if the scraper needs a different flow."""
         targets = regions or list(self.regions.keys())
-        metrics = get_metrics_collector()
+        # Use per-store database for parallel execution
+        metrics = get_metrics_collector(
+            db_path="data/metrics/{store}_runs.duckdb",
+            store_name=self.store_name
+        )
 
         # Start metrics tracking (single run for all regions)
         metrics.start_run(self.run_id, self.store_name, region="all")

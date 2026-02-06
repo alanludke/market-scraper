@@ -27,8 +27,20 @@ class MetricsCollector:
     - scraper_batches: Batch-level metrics for detailed analysis
     """
 
-    def __init__(self, db_path: str = "data/metrics/runs.duckdb"):
-        self.db_path = Path(db_path)
+    def __init__(self, db_path: str = "data/metrics/runs.duckdb", store_name: str = None):
+        """
+        Initialize metrics collector.
+
+        Args:
+            db_path: Path to DuckDB file (can include {store} placeholder)
+            store_name: Store name for per-store databases (optional)
+        """
+        # If store_name provided and path has placeholder, use per-store database
+        if store_name and "{store}" in db_path:
+            self.db_path = Path(db_path.replace("{store}", store_name))
+        else:
+            self.db_path = Path(db_path)
+
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
 
@@ -207,12 +219,13 @@ class MetricsCollector:
         if not self.current_run_id:
             return  # Silently skip if no active run
 
-        # Use timestamp with microseconds to ensure unique batch_id in parallel execution
-        timestamp_us = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        batch_id = f"{self.current_run_id}_batch_{batch_number}_{timestamp_us}"
-
         # Use current_region if region not explicitly provided
         region_value = region if region is not None else self.current_region
+
+        # Include region in batch_id to ensure uniqueness in parallel execution
+        timestamp_us = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        region_slug = region_value.replace("_", "") if region_value else "unknown"
+        batch_id = f"{self.current_run_id}_{region_slug}_batch_{batch_number}_{timestamp_us}"
 
         with _db_lock:
             with duckdb.connect(str(self.db_path)) as conn:
@@ -285,7 +298,8 @@ class MetricsCollector:
     def get_run_stats(self, days: int = 7):
         """Get run statistics for the last N days. Thread-safe."""
         with _db_lock:
-            with duckdb.connect(str(self.db_path)) as conn:
+            # Read-only query, no need for WAL pragma
+            with duckdb.connect(str(self.db_path), read_only=True) as conn:
                 return conn.execute("""
                     SELECT
                         store,
@@ -303,9 +317,25 @@ class MetricsCollector:
 _metrics_instance = None
 
 
-def get_metrics_collector(db_path: str = "data/metrics/runs.duckdb") -> MetricsCollector:
-    """Get or create the global metrics collector instance."""
+def get_metrics_collector(db_path: str = "data/metrics/runs.duckdb", store_name: str = None) -> MetricsCollector:
+    """
+    Get or create metrics collector instance.
+
+    For parallel execution, use per-store databases:
+        get_metrics_collector("data/metrics/{store}_runs.duckdb", store_name="bistek")
+
+    This creates data/metrics/bistek_runs.duckdb, avoiding file locking conflicts.
+
+    Note: When using per-store databases (with {store} placeholder), a new instance
+    is created each time. Otherwise, a singleton is used.
+    """
     global _metrics_instance
+
+    # If using per-store database, always create a new instance (no singleton)
+    if store_name and "{store}" in db_path:
+        return MetricsCollector(db_path, store_name)
+
+    # Otherwise, use singleton pattern
     if _metrics_instance is None:
-        _metrics_instance = MetricsCollector(db_path)
+        _metrics_instance = MetricsCollector(db_path, store_name)
     return _metrics_instance

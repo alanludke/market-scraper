@@ -28,7 +28,7 @@ with
             , _metadata_hub_id as hub_id
             , _metadata_run_id as run_id
             , cast(_metadata_scraped_at as timestamp) as scraped_at
-        from {{ source('bronze_bistek', 'products') }}
+        from {{ source_parquet('bronze_bistek', 'products') }}
         where productId is not null  -- Basic quality filter
     )
 
@@ -45,7 +45,7 @@ with
             , _metadata_hub_id as hub_id
             , _metadata_run_id as run_id
             , cast(_metadata_scraped_at as timestamp) as scraped_at
-        from {{ source('bronze_fort', 'products') }}
+        from {{ source_parquet('bronze_fort', 'products') }}
         where productId is not null
     )
 
@@ -62,7 +62,7 @@ with
             , _metadata_hub_id as hub_id
             , _metadata_run_id as run_id
             , cast(_metadata_scraped_at as timestamp) as scraped_at
-        from {{ source('bronze_giassi', 'products') }}
+        from {{ source_parquet('bronze_giassi', 'products') }}
         where productId is not null
     )
 
