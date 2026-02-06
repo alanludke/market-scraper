@@ -49,13 +49,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Database connection
-@st.cache_resource
-def get_duckdb_connection():
-    """Persistent DuckDB connection for dashboard."""
-    db_path = Path(__file__).parent.parent.parent / "data" / "analytics.duckdb"
-    conn = duckdb.connect(str(db_path), read_only=True)
-    return conn
+# Database connection (use db_manager for smart loading)
+from utils.db_manager import get_duckdb_connection
 
 # Load summary metrics
 @st.cache_data(ttl=300)  # Cache for 5 minutes
