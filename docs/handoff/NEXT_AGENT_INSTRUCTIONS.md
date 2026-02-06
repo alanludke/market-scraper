@@ -51,26 +51,83 @@ O Market Scraper está em **Fase 2** de desenvolvimento. A modelagem dimensional
 
 ---
 
-### Tarefa 2: Implementar Base de EANs (OpenFoodFacts) ⭐⭐ (2-3 semanas)
+### Tarefa 2: Implementar Base de EANs (OpenFoodFacts) ⭐⭐ ✅ COMPLETO
 
-**Status:** 0% (não iniciado)
+**Status:** 100% (implementado e automatizado)
 
 **Objetivo:** Integrar base de dados global de EANs para deduplicação e enriquecimento de produtos.
 
+**Resultado Final:**
+
+- ✅ Cobertura: 30.93% (6,885 de 22,263 EANs)
+- ✅ Bulk import via Parquet (6,043 produtos em 2 segundos)
+- ✅ Delta-sync incremental (835 produtos atualizados no primeiro run)
+- ✅ Automação Prefect: executa diariamente às 9:00 AM
+- ✅ dim_ean criado no DBT com surrogate keys
+- ✅ fct_daily_prices integrado com ean_key
+
+**Arquivos Implementados:**
+
+1. **Ingestão:**
+   - `cli_enrich.py` - CLI para bulk import e delta-sync
+   - `src/ingest/scrapers/openfoodfacts_enricher.py` - Pipeline de enriquecimento
+   - `src/ingest/loaders/ean_watermark.py` - Tracking incremental
+   - `src/schemas/openfoodfacts.py` - Validação Pydantic
+
+2. **Orquestração:**
+   - `src/orchestration/delta_sync_flow.py` - Prefect flow
+   - `prefect.yaml` - Deployment config
+   - `scripts/start_prefect.bat` - Startup automático
+
+3. **Transformação DBT:**
+   - `models/staging/stg_openfoodfacts__products.sql` - Staging layer
+   - `models/marts/conformed/dim_ean.sql` - Dimensão EAN
+   - `models/marts/pricing_marts/fct_daily_prices.sql` - Integração FK
+
+4. **Documentação:**
+   - `docs/operations/PREFECT_SETUP.md` - Setup completo Prefect
+   - `docs/operations/DELTA_SYNC_AUTOMATION.md` - Guia automação
+
+**Comandos:**
+
+```bash
+# Bulk import (primeira vez)
+python cli_enrich.py bulk-import --parquet path/to/openfoodfacts.parquet
+
+# Delta sync incremental
+python cli_enrich.py delta-sync
+
+# Stats de cobertura
+python cli_enrich.py stats
+
+# Prefect (automatizado - 9:00 AM diariamente)
+prefect deployment run daily-delta-sync/daily-delta-sync
+```
+
+**Próximos passos opcionais:**
+
+- Aumentar cobertura com base TACO (produtos brasileiros)
+- Migrar para bulk CSV download (otimização)
+- Adicionar fuzzy matching para produtos sem EAN
+
+**Ver implementação completa em:**
+
+- Plano original: `~/.claude/plans/prancy-launching-lemon.md`
+- Setup guide: `docs/operations/PREFECT_SETUP.md`
+
+---
+
+### Tarefa 3: Scraper de Concorrentes (Carrefour) ⭐ (3-4 semanas) - PRÓXIMA PRIORIDADE
+
+**Status:** 0% (não iniciado)
+
+**Objetivo:** Adicionar scraper para Carrefour (também usa VTEX) e permitir competitive benchmarking.
+
+**NOTA:** Com a implementação de dim_ean completa, esta tarefa agora tem maior ROI pois permite comparação de preços via EAN codes.
+
 **Passos:**
 
-1. **Criar scraper OpenFoodFacts**
-   ```python
-   # Localização: src/ingest/scrapers/openfoodfacts_scraper.py
-
-   import requests
-
-   class OpenFoodFactsScraper:
-       """Fetch product data from OpenFoodFacts API."""
-
-       BASE_URL = "https://world.openfoodfacts.org/api/v0"
-
-       def get_product_by_ean(self, ean: str):
+1. **Reusar VTEXScraper existente**
            """
            Fetch product by EAN code.
 
@@ -227,50 +284,6 @@ O Market Scraper está em **Fase 2** de desenvolvimento. A modelagem dimensional
 - Nutritional value vs price correlation
 - Organic premium analysis
 - Cross-store product matching (mesmo EAN, nomes diferentes)
-
----
-
-### Tarefa 3: Scraper de Concorrentes (Carrefour) ⭐ (3-4 semanas)
-
-**Status:** 0% (não iniciado)
-
-**Objetivo:** Adicionar scraper para Carrefour (também usa VTEX) e permitir competitive benchmarking.
-
-**Passos:**
-
-1. **Reusar VTEXScraper existente**
-   - Carrefour também usa VTEX platform
-   - Endpoint: `https://www.carrefour.com.br/api/catalog_system/pub/products/search`
-   - Apenas configurar novo store config em `config/stores.yaml`
-
-2. **Configurar novo source no DBT**
-   ```yaml
-   # src/transform/dbt_project/models/staging/sources.yml
-
-   - name: bronze_carrefour
-     description: Bronze layer data from Carrefour
-     tables:
-       - name: products
-         external:
-           location: '../../../../data/bronze/supermarket=carrefour/**/*.parquet'
-   ```
-
-3. **Atualizar staging model**
-   ```sql
-   -- src/transform/dbt_project/models/staging/stg_vtex__products.sql
-   -- Adicionar UNION ALL com bronze_carrefour
-   ```
-
-4. **Criar fct_competitive_pricing**
-   ```sql
-   -- Compare preços VTEX stores (bistek, fort, giassi) vs Carrefour
-   -- Join via ean_code (dim_ean)
-   ```
-
-**Recursos:**
-- Carrefour usa mesma API VTEX que Bistek/Fort/Giassi
-- Pode reusar 100% do código existente
-- Apenas adicionar configuração em `config/`
 
 ---
 
