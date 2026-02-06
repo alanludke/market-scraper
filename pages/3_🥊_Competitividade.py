@@ -88,7 +88,11 @@ if not multi_store.empty:
     multi_store['highest_price'] = multi_store['highest_price'].apply(lambda x: f"R$ {x:.2f}")
     multi_store['price_spread'] = multi_store['price_spread'].apply(lambda x: f"R$ {x:.2f}")
     # Format stores list to string
-    multi_store['stores'] = multi_store['stores'].apply(lambda x: ', '.join(sorted(x)) if isinstance(x, list) else str(x))
+    def format_stores(x):
+        if isinstance(x, list):
+            return ', '.join(sorted(x))
+        return str(x)
+    multi_store['stores'] = multi_store['stores'].apply(format_stores)
 
     st.dataframe(
         multi_store.rename(columns={
