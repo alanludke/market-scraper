@@ -91,18 +91,13 @@ snapshots:
   +updated_at: scraped_at
 
 # ═══════════════════════════════════════════════════════════════════════════
-# DOCUMENTATION
-# ═══════════════════════════════════════════════════════════════════════════
-
-# Persist docs apenas em prod/ci (padrão Indicium)
-vars:
-  persist_docs_target: "{{ target.name in ('prod', 'ci') }}"
-
-# ═══════════════════════════════════════════════════════════════════════════
 # PROJECT VARIABLES
 # ═══════════════════════════════════════════════════════════════════════════
 
 vars:
+  # Persist docs apenas em prod/ci (padrão Indicium)
+  persist_docs_target: "{{ target.name in ('prod', 'ci') }}"
+
   # Partições para incremental (usado em transformações)
   # Formato: lista de datas a reprocessar
   partitions_to_replace: []
