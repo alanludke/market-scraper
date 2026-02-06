@@ -7,6 +7,7 @@ Shows what's happening in real-time by reading metrics with retry logic.
 import duckdb
 import time
 from datetime import datetime
+import pandas as pd
 
 def analyze_running_scraper():
     db_path = "data/metrics/runs.duckdb"
@@ -17,11 +18,11 @@ def analyze_running_scraper():
             conn = duckdb.connect(db_path, read_only=True)
 
             print("=" * 80)
-            print("🔍 SCRAPER PROGRESS ANALYSIS (Real-time)")
+            print("SCRAPER PROGRESS ANALYSIS (Real-time)")
             print("=" * 80)
 
             # 1. Running runs
-            print("\n📊 RUNNING RUNS")
+            print("\nRUNNING RUNS")
             print("-" * 80)
             runs = conn.execute("""
                 SELECT
@@ -44,15 +45,15 @@ def analyze_running_scraper():
                     print(f"  Started: {run['started_at']}")
                     print(f"  Running for: {run['minutes_running']:.1f} minutes")
                     print(f"  Discovery mode: {run['discovery_mode']}")
-                    if run['discovery_duration_seconds']:
+                    if pd.notna(run['discovery_duration_seconds']):
                         print(f"  Discovery took: {run['discovery_duration_seconds']:.1f} seconds")
-                    if run['products_discovered']:
+                    if pd.notna(run['products_discovered']):
                         print(f"  Products discovered: {run['products_discovered']}")
             else:
                 print("No running scraper found!")
 
             # 2. Batch progress
-            print("\n\n📦 BATCH PROGRESS (Last 20 batches)")
+            print("\n\nBATCH PROGRESS (Last 20 batches)")
             print("-" * 80)
             batches = conn.execute("""
                 SELECT
@@ -73,7 +74,7 @@ def analyze_running_scraper():
 
             if not batches.empty:
                 for _, batch in batches.iterrows():
-                    status = "✅" if batch['success'] else "❌"
+                    status = "[OK]" if batch['success'] else "[FAIL]"
                     print(f"{status} {batch['store']:8} {batch['region']:25} "
                           f"batch {batch['batch_number']:4} | "
                           f"{batch['products_count']:3} products | "
@@ -83,7 +84,7 @@ def analyze_running_scraper():
                 print("No batches found yet!")
 
             # 3. Performance summary
-            print("\n\n⚡ PERFORMANCE SUMMARY (Running batches)")
+            print("\n\nPERFORMANCE SUMMARY (Running batches)")
             print("-" * 80)
             perf = conn.execute("""
                 SELECT
@@ -108,7 +109,7 @@ def analyze_running_scraper():
                           f"{row['avg_response_ms']:>10.0f} {row['max_response_ms']:>10.0f} {row['total_products']:>10}")
 
             # 4. Time estimate
-            print("\n\n⏱️  TIME ESTIMATE")
+            print("\n\nTIME ESTIMATE")
             print("-" * 80)
             estimate = conn.execute("""
                 SELECT
@@ -134,8 +135,8 @@ def analyze_running_scraper():
 
                 if estimated_remaining > 0:
                     estimated_time_remaining = (estimated_remaining * avg_batch_ms) / 1000 / 60
-                    print(f"\n⚠️  Rough estimate: {estimated_remaining} batches remaining")
-                    print(f"   Estimated time remaining: {estimated_time_remaining:.0f} minutes")
+                    print(f"\n[!] Rough estimate: {estimated_remaining} batches remaining")
+                    print(f"    Estimated time remaining: {estimated_time_remaining:.0f} minutes")
 
             conn.close()
             break
@@ -147,9 +148,9 @@ def analyze_running_scraper():
             else:
                 raise
     else:
-        print("❌ Could not access database after 5 attempts")
-        print("   The scraper is probably writing heavily to the DB")
-        print("   Try canceling the scraper first, then run analysis")
+        print("[ERROR] Could not access database after 5 attempts")
+        print("        The scraper is probably writing heavily to the DB")
+        print("        Try canceling the scraper first, then run analysis")
 
 if __name__ == "__main__":
     analyze_running_scraper()
