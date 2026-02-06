@@ -50,7 +50,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Database connection (use db_manager for smart loading)
-from utils.db_manager import get_duckdb_connection
+from dashboard.utils.db_manager import get_duckdb_connection
 
 # Load summary metrics
 @st.cache_data(ttl=300)  # Cache for 5 minutes
