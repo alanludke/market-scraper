@@ -22,6 +22,7 @@ from prefect.tasks import task_input_hash
 from datetime import timedelta
 import subprocess
 import logging
+import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -43,12 +44,20 @@ def run_delta_sync():
     """
     print("[1/2] Starting delta-sync...")
 
+    # Get project root and add to PYTHONPATH
+    project_root = Path(__file__).parent.parent.parent
+
+    # Prepare environment with PYTHONPATH
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(project_root)
+
     # Run CLI command
     result = subprocess.run(
-        ["python", "cli_enrich.py", "delta-sync"],
+        ["python", "scripts/cli_enrich.py", "delta-sync"],
         capture_output=True,
         text=True,
-        cwd=Path(__file__).parent.parent.parent  # Project root
+        cwd=project_root,
+        env=env
     )
 
     if result.returncode != 0:
