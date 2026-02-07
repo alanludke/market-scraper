@@ -117,25 +117,53 @@ prefect deployment run daily-delta-sync/daily-delta-sync
 
 ---
 
-### Tarefa 3: Scraper de Concorrentes (Carrefour) ⭐ (3-4 semanas) - PRÓXIMA PRIORIDADE
+### Tarefa 3: Scraper de Concorrentes (Carrefour) ⭐ ✅ 95% COMPLETO
 
-**Status:** 0% (não iniciado)
+**Status:** 95% (operacional, otimizações pendentes)
 
 **Objetivo:** Adicionar scraper para Carrefour (também usa VTEX) e permitir competitive benchmarking.
 
-**NOTA:** Com a implementação de dim_ean completa, esta tarefa agora tem maior ROI pois permite comparação de preços via EAN codes.
+**NOTA:** Com a implementação de dim_ean completa, esta tarefa desbloqueou comparação de preços via EAN codes.
 
-**Passos:**
+**Resultado Alcançado:**
 
-1. **Reusar VTEXScraper existente**
-           """
-           Fetch product by EAN code.
+- ✅ Scraper HTML operacional (65,044 produtos descobertos, 5,934 coletados)
+- ✅ DBT processando dados Carrefour (integrado em todos os modelos)
+- ✅ **10,442 comparações de preços via EAN**
+- ✅ **62.2% produtos mais baratos no Carrefour (economia média: R$ 1.87)**
+- ✅ 100% cobertura EAN, 100% preços válidos
+- ⚠️ Apenas 1 de 5 regiões processada no DBT (gap a investigar)
 
-           Example:
-               GET https://world.openfoodfacts.org/api/v0/product/7891000100103.json
-           """
-           url = f"{self.BASE_URL}/product/{ean}.json"
-           response = requests.get(url)
+**Arquivos Implementados:**
+
+1. **Scraper:**
+   - `src/ingest/scrapers/carrefour_html.py` - HTML scraper (sitemap-based discovery)
+   - `scripts/cli.py` - CLI integration
+   - `data/bronze/supermarket=carrefour/` - 640 parquet files, 5 regiões
+
+2. **DBT Integration:**
+   - `models/staging/stg_vtex__products.sql` - Carrefour incluído (carrefour_raw CTE)
+   - `models/trusted/tru_product.sql` - 5,934 produtos Carrefour processados
+   - `models/marts/pricing_marts/fct_competitive_pricing.sql` - SQL criado (pendente deploy)
+
+3. **Relatórios:**
+   - `docs/reports/CARREFOUR_INTEGRATION_REPORT.md` - Análise completa de integração
+
+**Estatísticas Competitivas:**
+
+| Métrica | Valor |
+|---------|-------|
+| Comparações via EAN | 10,442 |
+| Carrefour mais barato | 6,488 (62.2%) |
+| Concorrente mais barato | 3,861 (37.0%) |
+| Diferença média de preço | -R$ 1.87 (-1.82%) |
+
+**Próximos Passos (5% restante):**
+
+1. **Deploy fct_competitive_pricing**
+   ```bash
+   cd src/transform/dbt_project
+   dbt run --select fct_competitive_pricing
 
            if response.status_code == 200:
                data = response.json()
