@@ -297,7 +297,7 @@ with col1:
             height=400,
             showlegend=False
         )
-        st.plotly_chart(fig_store_count, use_container_width=True)
+        st.plotly_chart(fig_store_count, width="stretch")
 
 with col2:
     # Average discount by store
@@ -318,7 +318,7 @@ with col2:
             height=400,
             showlegend=False
         )
-        st.plotly_chart(fig_store_discount, use_container_width=True)
+        st.plotly_chart(fig_store_discount, width="stretch")
 
 # Store details table
 if not data['by_store'].empty:
@@ -332,7 +332,7 @@ if not data['by_store'].empty:
             'Economia Total (R$)': 'R$ {:,.2f}',
             'Hot Deals': '{:,}'
         }),
-        use_container_width=True
+        width="stretch"
     )
 
 st.markdown("---")
@@ -368,7 +368,7 @@ if not data['strategic_matrix'].empty:
         title="Matriz Amplitude vs Profundidade de Promoções",
         height=500
     )
-    st.plotly_chart(fig_matrix, use_container_width=True)
+    st.plotly_chart(fig_matrix, width="stretch")
 
     # Quadrant analysis
     median_amplitude = data['strategic_matrix']['promo_amplitude'].median()
@@ -417,7 +417,7 @@ if not data['discount_distribution'].empty:
         height=400,
         showlegend=False
     )
-    st.plotly_chart(fig_dist, use_container_width=True)
+    st.plotly_chart(fig_dist, width="stretch")
 
 st.markdown("---")
 
@@ -441,7 +441,7 @@ if not data['hot_deals'].empty:
                 'Desconto %': '{:.1f}%',
                 'Economia': 'R$ {:.2f}'
             }),
-            use_container_width=True
+            width="stretch"
         )
 
     with col2:
@@ -455,7 +455,7 @@ if not data['hot_deals'].empty:
                 'Desconto %': '{:.1f}%',
                 'Economia': 'R$ {:.2f}'
             }),
-            use_container_width=True
+            width="stretch"
         )
 
     # Full hot deals table (expandable)
@@ -469,7 +469,7 @@ if not data['hot_deals'].empty:
                 'Desconto %': '{:.1f}%',
                 'Economia': 'R$ {:.2f}'
             }),
-            use_container_width=True,
+            width="stretch",
             height=600
         )
 else:
@@ -499,7 +499,7 @@ if not data['best_savings'].empty:
         title="Top 15 Produtos - Maior Economia Absoluta",
         height=500
     )
-    st.plotly_chart(fig_savings, use_container_width=True)
+    st.plotly_chart(fig_savings, width="stretch")
 
     # Full table
     display_df = data['best_savings'].copy()
@@ -511,7 +511,7 @@ if not data['best_savings'].empty:
             'Desconto %': '{:.1f}%',
             'Economia': 'R$ {:.2f}'
         }),
-        use_container_width=True
+        width="stretch"
     )
 
 st.markdown("---")
@@ -538,7 +538,7 @@ if not data['by_brand'].empty:
             title="Top 10 Marcas com Mais Promoções",
             height=400
         )
-        st.plotly_chart(fig_brand, use_container_width=True)
+        st.plotly_chart(fig_brand, width="stretch")
 
     with col2:
         st.markdown("**Detalhes por Marca**")
@@ -550,7 +550,7 @@ if not data['by_brand'].empty:
                 'Desconto %': '{:.1f}%',
                 'Economia': 'R$ {:,.2f}'
             }),
-            use_container_width=True,
+            width="stretch",
             height=400
         )
 

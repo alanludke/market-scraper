@@ -415,7 +415,7 @@ if not data['store_positioning'].empty:
             height=400
         )
 
-        st.plotly_chart(fig_positioning, use_container_width=True)
+        st.plotly_chart(fig_positioning, width="stretch")
 
     with col2:
         st.markdown("**Detalhes por Loja**")
@@ -429,7 +429,7 @@ if not data['store_positioning'].empty:
                 'Produtos': '{:,}',
                 'Taxa Promo %': '{:.1f}%'
             }),
-            use_container_width=True,
+            width="stretch",
             height=400
         )
 
@@ -470,7 +470,7 @@ if not data['price_index'].empty:
         showlegend=False
     )
 
-    st.plotly_chart(fig_index, use_container_width=True)
+    st.plotly_chart(fig_index, width="stretch")
 
     # Best value insight
     best_value = data['price_index'].iloc[0]
@@ -503,7 +503,7 @@ if not data['win_rate'].empty:
         height=400,
         showlegend=False
     )
-    st.plotly_chart(fig_winrate, use_container_width=True)
+    st.plotly_chart(fig_winrate, width="stretch")
 
     # Win rate table with absolute numbers
     display_df = data['win_rate'].copy()
@@ -513,7 +513,7 @@ if not data['win_rate'].empty:
             'Vitórias': '{:,}',
             'Win Rate (%)': '{:.1f}%'
         }),
-        use_container_width=True
+        width="stretch"
     )
 
 st.markdown("---")
@@ -543,7 +543,7 @@ if not data['price_gaps'].empty:
             title="Top 20 Produtos - Maior Diferença de Preço",
             height=600
         )
-        st.plotly_chart(fig_gaps, use_container_width=True)
+        st.plotly_chart(fig_gaps, width="stretch")
 
     with col2:
         st.markdown("**Onde comprar cada produto**")
@@ -555,7 +555,7 @@ if not data['price_gaps'].empty:
                 'Menor Preço': 'R$ {:.2f}',
                 'Economia': 'R$ {:.2f}'
             }),
-            use_container_width=True,
+            width="stretch",
             height=600
         )
 
@@ -570,7 +570,7 @@ if not data['price_gaps'].empty:
                 'Gap R$': 'R$ {:.2f}',
                 'Gap %': '{:.1f}%'
             }),
-            use_container_width=True,
+            width="stretch",
             height=600
         )
 else:
@@ -595,7 +595,7 @@ if not data['brand_leaders'].empty:
         display_df.columns = ['Marca', 'Líder de Preço', 'Preço Médio']
         st.dataframe(
             display_df.style.format({'Preço Médio': 'R$ {:.2f}'}),
-            use_container_width=True,
+            width="stretch",
             height=500
         )
 
@@ -608,7 +608,7 @@ if not data['brand_leaders'].empty:
             title="Distribuição de Liderança por Marca"
         )
         fig_dominance.update_layout(height=500)
-        st.plotly_chart(fig_dominance, use_container_width=True)
+        st.plotly_chart(fig_dominance, width="stretch")
 
     # Dominance insight
     dominant_store = leader_count.index[0]
@@ -647,7 +647,7 @@ if not data['cross_shopping'].empty:
             basket_by_store.style.format({
                 'Total': 'R$ {:.2f}'
             }),
-            use_container_width=True
+            width="stretch"
         )
 
         total_savings = data['cross_shopping']['best_price'].sum()
@@ -669,7 +669,7 @@ if not data['cross_shopping'].empty:
             title="Distribuição da Cesta Ideal por Loja",
             height=400
         )
-        st.plotly_chart(fig_basket, use_container_width=True)
+        st.plotly_chart(fig_basket, width="stretch")
 
     # Full cross-shopping list
     with st.expander("📋 Ver lista completa de produtos para cross-shopping"):
@@ -677,7 +677,7 @@ if not data['cross_shopping'].empty:
         display_df.columns = ['Produto', 'Melhor Loja', 'Menor Preço']
         st.dataframe(
             display_df.style.format({'Menor Preço': 'R$ {:.2f}'}),
-            use_container_width=True,
+            width="stretch",
             height=600
         )
 

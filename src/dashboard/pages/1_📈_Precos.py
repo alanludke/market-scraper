@@ -297,7 +297,7 @@ if not data['daily_evolution'].empty:
         height=400
     )
 
-    st.plotly_chart(fig_evolution, use_container_width=True)
+    st.plotly_chart(fig_evolution, width="stretch")
 
     # Trend insight
     if len(data['daily_evolution']) >= 2:
@@ -338,7 +338,7 @@ with col1:
             height=400,
             showlegend=False
         )
-        st.plotly_chart(fig_stores, use_container_width=True)
+        st.plotly_chart(fig_stores, width="stretch")
 
 with col2:
     # Store statistics table
@@ -354,7 +354,7 @@ with col2:
                 'Max': 'R$ {:.2f}',
                 'Produtos': '{:,}'
             }),
-            use_container_width=True,
+            width="stretch",
             height=400
         )
 
@@ -381,7 +381,7 @@ if not data['histogram'].empty:
         height=400,
         showlegend=False
     )
-    st.plotly_chart(fig_hist, use_container_width=True)
+    st.plotly_chart(fig_hist, width="stretch")
 
 st.markdown("---")
 
@@ -397,7 +397,7 @@ with col1:
         display_df.columns = ['Produto', 'Loja', 'Preço', 'Marca']
         st.dataframe(
             display_df.style.format({'Preço': 'R$ {:.2f}'}),
-            use_container_width=True,
+            width="stretch",
             height=500
         )
     else:
@@ -410,7 +410,7 @@ with col2:
         display_df.columns = ['Produto', 'Loja', 'Preço', 'Marca']
         st.dataframe(
             display_df.style.format({'Preço': 'R$ {:.2f}'}),
-            use_container_width=True,
+            width="stretch",
             height=500
         )
     else:
@@ -443,7 +443,7 @@ if not data['volatility'].empty:
         height=500,
         showlegend=False
     )
-    st.plotly_chart(fig_volatility, use_container_width=True)
+    st.plotly_chart(fig_volatility, width="stretch")
 
     # Volatility table
     st.markdown("**Detalhes de Volatilidade**")
@@ -455,7 +455,7 @@ if not data['volatility'].empty:
             'Desvio Padrão': 'R$ {:.2f}',
             'CV (%)': '{:.1f}%'
         }),
-        use_container_width=True
+        width="stretch"
     )
 else:
     st.info("📊 Dados insuficientes para análise de volatilidade (necessário 3+ dias de observação)")
