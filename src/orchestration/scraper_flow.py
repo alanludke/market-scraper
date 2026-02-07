@@ -19,6 +19,7 @@ Usage:
 
 from prefect import flow, task
 from datetime import timedelta
+from typing import Optional, List
 import subprocess
 import logging
 import os
@@ -61,10 +62,12 @@ def scrape_store(store_name: str) -> dict:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(project_root)
 
-    # Run CLI command with incremental scraping (faster for daily updates)
-    # Use --incremental 1 to scrape only products modified in last 24 hours
+    # Run CLI command
+    # First run: Full scraping (no --incremental)
+    # Subsequent runs: Use --incremental 7 (last 7 days) to capture updates
+    # For now, doing FULL scraping to ensure we get all data
     result = subprocess.run(
-        ["python", "scripts/cli.py", "scrape", store_name, "--incremental", "1"],
+        ["python", "scripts/cli.py", "scrape", store_name],
         capture_output=True,
         text=True,
         cwd=project_root,
@@ -107,7 +110,7 @@ def scrape_store(store_name: str) -> dict:
     description="Daily scraping of all supermarket stores (parallel execution)",
     log_prints=True
 )
-def daily_scraper_flow(stores: list = None) -> dict:
+def daily_scraper_flow(stores: Optional[List[str]] = None) -> dict:
     """
     Main flow for daily scraping of all stores.
 
@@ -131,14 +134,14 @@ def daily_scraper_flow(stores: list = None) -> dict:
 
     # Determine which stores to scrape
     if stores is None:
-        # Scrape all active stores (excluding incomplete ones)
+        # Scrape ALL active stores
         stores_to_scrape = [
             "bistek",
             "fort",
             "giassi",
             "carrefour",
-            # "angeloni",  # Uncomment when ready
-            # "superkoch",  # Uncomment when ready
+            "angeloni",
+            "superkoch",
         ]
     else:
         stores_to_scrape = stores

@@ -210,6 +210,151 @@ class CarrefourHTMLScraper(BaseScraper):
 
         return discovered
 
+    def discover_new_products(
+        self,
+        previous_run_file: Optional[str] = None,
+        limit: Optional[int] = None
+    ) -> List[str]:
+        """
+        Discover only products not present in previous run (new arrivals).
+
+        This method compares current sitemap with a previous run's data,
+        returning only URLs not seen before. Useful for incremental scraping
+        when sitemap lastmod is not maintained (like Carrefour).
+
+        Args:
+            previous_run_file: Path to previous run parquet file (optional)
+                              If None, tries to find most recent run automatically
+            limit: Max products to return (optional)
+
+        Returns:
+            List of new product URLs
+
+        Example:
+            # Auto-detect previous run
+            urls = scraper.discover_new_products()
+
+            # Specific previous file
+            urls = scraper.discover_new_products(
+                previous_run_file='data/bronze/.../carrefour_full.parquet'
+            )
+        """
+        import pandas as pd
+        from pathlib import Path
+
+        # Find previous run file if not specified
+        if previous_run_file is None:
+            bronze_path = Path("data/bronze")
+            store_path = bronze_path / f"supermarket={self.store_name}"
+
+            if store_path.exists():
+                parquet_files = list(store_path.rglob("*_full.parquet"))
+                if parquet_files:
+                    # Get most recent
+                    previous_run_file = str(max(parquet_files, key=lambda p: p.stat().st_mtime))
+                    logger.info(f"[{self.store_name}] Using previous run: {previous_run_file}")
+
+        if not previous_run_file or not Path(previous_run_file).exists():
+            logger.warning(
+                f"[{self.store_name}] No previous run found. "
+                f"Falling back to full discovery."
+            )
+            return self.discover_products(limit=limit)
+
+        # Load previous URLs
+        try:
+            df_prev = pd.read_parquet(previous_run_file)
+            previous_urls = set(df_prev['link'].unique())
+            logger.info(
+                f"[{self.store_name}] Previous run had {len(previous_urls):,} products"
+            )
+        except Exception as e:
+            logger.error(f"Failed to load previous run: {e}")
+            return self.discover_products(limit=limit)
+
+        # Discover all current products
+        logger.info(f"[{self.store_name}] Discovering current products...")
+        all_products = self.discover_products(limit=None)
+
+        # Filter new ones
+        new_products = [url for url in all_products if url not in previous_urls]
+
+        logger.info(
+            f"[{self.store_name}] Found {len(new_products):,} new products "
+            f"({len(new_products)/len(all_products)*100:.1f}% of catalog)"
+        )
+
+        return new_products[:limit] if limit else new_products
+
+    def discover_sample(
+        self,
+        sample_rate: float = 0.1,
+        priority_patterns: Optional[List[str]] = None,
+        limit: Optional[int] = None
+    ) -> List[str]:
+        """
+        Discover products using sampling strategy for quick daily checks.
+
+        Combines priority categories (always scraped) with random sampling
+        of other products. Good for monitoring trends without full scrapes.
+
+        Args:
+            sample_rate: Sampling rate for non-priority products (0.1 = 10%)
+            priority_patterns: URL patterns for high-priority categories
+                              Default: fresh food, promotions
+            limit: Max products to return (optional)
+
+        Returns:
+            List of sampled product URLs
+
+        Example:
+            # Daily monitoring: 10% sample + priority categories
+            urls = scraper.discover_sample(sample_rate=0.1)
+
+            # Quick check: 5% sample
+            urls = scraper.discover_sample(sample_rate=0.05)
+        """
+        import random
+
+        if priority_patterns is None:
+            priority_patterns = [
+                '/hortifruti/',
+                '/acougue-e-peixaria/',
+                '/frios-e-laticinios/',
+                '/ofertas/',
+                '/promocao/',
+            ]
+
+        logger.info(
+            f"[{self.store_name}] Discovering products "
+            f"(priority categories + {sample_rate*100:.0f}% sample)"
+        )
+
+        all_products = self.discover_products()
+
+        priority = []
+        others = []
+
+        for url in all_products:
+            if any(pattern in url for pattern in priority_patterns):
+                priority.append(url)
+            else:
+                others.append(url)
+
+        # Sample non-priority
+        sample_count = int(len(others) * sample_rate)
+        sampled = random.sample(others, min(sample_count, len(others)))
+
+        selected = priority + sampled
+
+        logger.info(
+            f"[{self.store_name}] Selected {len(priority):,} priority + "
+            f"{len(sampled):,} sampled = {len(selected):,} total "
+            f"({len(selected)/len(all_products)*100:.1f}% of catalog)"
+        )
+
+        return selected[:limit] if limit else selected
+
     def scrape_product_page(self, url: str) -> Optional[Dict[str, Any]]:
         """
         Scrape a single product page and extract JSON-LD data.

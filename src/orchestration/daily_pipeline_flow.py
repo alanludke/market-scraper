@@ -25,6 +25,7 @@ Usage:
 
 from prefect import flow
 from datetime import datetime
+from typing import Optional, List
 import logging
 
 # Import all sub-flows
@@ -46,7 +47,7 @@ def daily_pipeline_flow(
     run_enrichment: bool = True,
     run_transform: bool = True,
     run_analytics: bool = True,
-    scrape_stores: list = None,
+    scrape_stores: Optional[List[str]] = None,
 ) -> dict:
     """
     Main orchestrator flow for the entire data platform.

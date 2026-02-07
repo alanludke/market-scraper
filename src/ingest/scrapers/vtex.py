@@ -163,6 +163,20 @@ class VTEXScraper(BaseScraper):
             )
 
         return validated
+    
+    
+    def scrape_region(self, region_key: str, product_urls: list[str]):
+        """
+        Implementação do método obrigatório da BaseScraper.
+        Direciona a execução para a lógica de scraping por IDs da VTEX.
+        """
+        # Como o cli.py já descobriu as URLs, aqui nós as convertemos 
+        # de volta para IDs caso necessário, ou passamos a lista.
+        # No caso da VTEX, o _scrape_by_ids espera uma lista de IDs.
+        
+        # Extrair IDs das URLs se necessário (ex: de ".../p?id=123" para "123")
+        # Mas o cli.py normalmente já passa o que o discover retornou.
+        return self._scrape_by_ids(region_key, product_urls)
 
     # ── Entry point ─────────────────────────────────────────────
 
