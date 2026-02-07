@@ -282,19 +282,77 @@ stomarketscraper/
 ## Future Roadmap
 
 ### Short Term (1-3 months)
-- [ ] Prefect orchestration (replace cron)
-- [ ] Multi-stage Docker (ingest, transform, dashboard)
 - [ ] E2E tests (pytest with 80%+ coverage)
+- [x] **Carrefour scraper completion** (HTML parsing finalization) ✅ COMPLETED (Feb 2026)
+- [x] **Angeloni integration** (HTML scraper, 3 regions) ✅ COMPLETED (Feb 2026)
 
-### Medium Term (3-6 months)
-- [ ] Add more stores (10+ supermarkets)
-- [ ] Real-time scraping (streaming vs batch)
-- [ ] REST API (FastAPI serving gold layer)
+### Medium Term (3-6 months) - **Market Coverage Expansion**
 
-### Long Term (6-12 months)
-- [ ] Terraform (IaC for Azure resources)
-- [ ] Airflow/Dagster (if advanced orchestration needed)
-- [ ] ML models (price prediction, anomaly detection)
+#### Regional Supermarket Chains (6 stores)
+- [x] **Angeloni** (angeloni.com.br) - Multicategory, quality benchmark ✅ IMPLEMENTED (Feb 2026)
+- [x] **Super Koch** (superkoch.com.br) - Atacarejo, Balneário Camboriú + Camboriú ✅ IMPLEMENTED (Feb 2026)
+- [ ] **Brasil Atacadista** (brasilatacadista.com.br) - Atacarejo, Island + Biguaçu
+- [ ] **Hippo Supermercados** (hipposupermercados.com.br) - Premium/Gourmet, Center
+- [ ] **Hiper Select** (hiperselectsupermercados.com.br) - Neighborhood retail
+- [ ] **Manentti** (manentti.com.br) - Regional, São José industrial
+
+#### Vertical Expansion
+- [ ] **Pharmacy vertical**: Droga Raia, Preço Popular
+- [ ] **Pet shop vertical**: Cobasi, Petlove, Bicho da Casa (Rede Pet Sim)
+- [ ] **Delivery marketplaces**: iFood, Rappi (capture dark stores)
+
+#### Infrastructure
+- [ ] Generic scraper framework (reuse for non-VTEX platforms)
+- [ ] Multi-vertical schema support (pharmacy, pet, delivery)
+
+### Long Term (6-12+ months) - **Intelligence Platform**
+
+#### Fiscal Data Integration
+- [ ] **NFC-e integration** (SEFAZ-SC via Infosimples API)
+- [ ] Real transaction price vs shelf price analysis
+- [ ] Convenience markup calculation (delivery vs in-store)
+- [ ] Independent retailer coverage (non-digital stores via NFC-e)
+
+#### Product Master Data Enrichment
+- [ ] **GS1 CNP integration** (official product registry, photos, specs)
+- [ ] **Bluesoft Cosmos** (NCM classification, category taxonomy)
+- [ ] **api-produtos** (unified product images by EAN)
+- [ ] **eanpictures** (visual enrichment)
+- [ ] **SerpApi** (Google Shopping reviews and ratings)
+
+#### Advanced Data Quality
+- [ ] **Fuzzy matching** (RapidFuzz for product name deduplication)
+- [ ] **Record linkage** (dedupe library with ML for cross-store matching)
+- [ ] Levenshtein distance-based product matching
+- [ ] Automated product variant detection
+
+#### Analytics & Intelligence
+- [ ] **REST API** (FastAPI serving gold layer)
+- [ ] Real-time competitive intelligence dashboard
+- [ ] Price elasticity analysis (demand vs price correlation)
+- [ ] **ML models** (price prediction, anomaly detection)
+- [ ] Territorial competitiveness analysis
+- [ ] Promotional cycle prediction
+
+#### Platform Maturity
+- [ ] **Prefect orchestration** (replace cron)
+- [ ] **Multi-stage Docker** (ingest, transform, dashboard)
+- [ ] **Terraform** (IaC for Azure resources)
+- [ ] Advanced orchestration (evaluate Airflow/Dagster if needed)
+- [ ] Mobile app (consumer price comparison - "Menor Preço Floripa")
+- [ ] B2B SaaS offering (retail intelligence platform)
+
+### Vision (12+ months) - **Market Intelligence Leader**
+
+Transform from scraper to comprehensive retail intelligence platform:
+- **Coverage**: 15+ stores across supermarket, pharmacy, pet, delivery verticals
+- **Intelligence**: Real prices (NFC-e) + enriched metadata (GS1) + competitive benchmarks
+- **Automation**: End-to-end pipeline (scraping → enrichment → fuzzy matching → analytics)
+- **Insights**: Price elasticity, territorial competitiveness, promotional intelligence
+- **Benchmarking**: Match capabilities of ClickSuper, Zukkin, Precifica
+- **Business model**: B2B SaaS for retailers (pricing strategy, competitive intelligence)
+
+**Note**: GS1 CNP and Infosimples NFC-e API are paid services - implement only after validating ROI with free alternatives (OpenFoodFacts, manual NFC-e sampling). Prioritization: Geographic coverage (Medium Term) must come before advanced enrichment (Long Term) - need critical mass of data first.
 
 ## Cost Optimization
 
