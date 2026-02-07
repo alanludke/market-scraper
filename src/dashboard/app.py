@@ -60,7 +60,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Database connection
-from dashboard.utils.db_manager import get_duckdb_connection
+from utils.db_manager import get_duckdb_connection
 
 @st.cache_data(ttl=300)  # Cache for 5 minutes
 def load_executive_summary():
