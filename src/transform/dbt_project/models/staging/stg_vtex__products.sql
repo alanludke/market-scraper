@@ -3,7 +3,7 @@
     Layer: Staging (Ephemeral)
 
     Description:
-        Unifies raw product data from 4 VTEX supermarkets (Bistek, Fort, Giassi, Carrefour).
+        Unifies raw product data from 5 VTEX supermarkets (Bistek, Fort, Giassi, Carrefour, Angeloni).
         Applies basic cleansing and column standardization.
 
     Grain: product_id + region + run_id (raw, without deduplication)
@@ -84,6 +84,23 @@ with
         where productId is not null
     )
 
+    , angeloni_raw as (
+        select
+            productId as product_id
+            , productName as product_name
+            , brand
+            , link as product_url
+            , items
+            , _metadata_supermarket as supermarket
+            , _metadata_region as region
+            , _metadata_postal_code as postal_code
+            , _metadata_hub_id as hub_id
+            , _metadata_run_id as run_id
+            , cast(_metadata_scraped_at as timestamp) as scraped_at
+        from {{ source_parquet('bronze_angeloni', 'products') }}
+        where productId is not null
+    )
+
     , unified as (
         select * from bistek_raw
         union all
@@ -92,6 +109,8 @@ with
         select * from giassi_raw
         union all
         select * from carrefour_raw
+        union all
+        select * from angeloni_raw
     )
 
 select *

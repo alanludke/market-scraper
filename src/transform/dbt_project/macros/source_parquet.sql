@@ -19,6 +19,7 @@
         'bronze_fort': '../../../data/bronze/supermarket=fort/**/*.parquet',
         'bronze_giassi': '../../../data/bronze/supermarket=giassi/**/*.parquet',
         'bronze_carrefour': '../../../data/bronze/supermarket=carrefour/**/*.parquet',
+        'bronze_angeloni': '../../../data/bronze/supermarket=angeloni/**/*.parquet',
         'bronze_openfoodfacts': '../../../data/bronze/supermarket=openfoodfacts/**/*.parquet'
     } -%}
 

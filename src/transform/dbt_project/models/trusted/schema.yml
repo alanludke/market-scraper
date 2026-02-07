@@ -62,14 +62,14 @@ models:
       # Location
       # ─────────────────────────────────────────────────────────────
       - name: supermarket
-        description: Store identifier (bistek, fort, giassi)
+        description: Store identifier (bistek, fort, giassi, carrefour, angeloni)
         data_type: varchar
         constraints:
           - type: not_null
         tests:
           - accepted_values:
               arguments:
-                values: ['bistek', 'fort', 'giassi']
+                values: ['bistek', 'fort', 'giassi', 'carrefour', 'angeloni']
 
       - name: region
         description: Geographic region code (e.g. florianopolis_costeira)

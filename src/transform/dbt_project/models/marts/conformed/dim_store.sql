@@ -30,7 +30,8 @@ with
                 ('bistek', 'Bistek Supermercados', 'supermarket', 'SC/RS', true, 13, 'https://www.bistek.com.br'),
                 ('fort', 'Fort Atacadista', 'wholesale', 'SC', true, 7, 'https://www.fortatacadista.com.br'),
                 ('giassi', 'Giassi Supermercados', 'hypermarket', 'SC', true, 17, 'https://www.giassi.com.br'),
-                ('carrefour', 'Carrefour', 'hypermarket', 'SC', true, 5, 'https://mercado.carrefour.com.br')
+                ('carrefour', 'Carrefour', 'hypermarket', 'SC', true, 5, 'https://mercado.carrefour.com.br'),
+                ('angeloni', 'Angeloni', 'supermarket', 'SC/PR', true, 3, 'https://www.angeloni.com.br')
         ) as t(store_id, store_name, store_type, coverage_states, is_active, region_count, website_url)
     )
 

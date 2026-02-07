@@ -247,3 +247,54 @@ stores:
         cep: "89201-400"
         sc: "1"
         hub_id: null
+
+  # --------------------------------------------------------------------------
+  # ANGELONI - HTML scraping (VTEX platform with blocked API)
+  # --------------------------------------------------------------------------
+  angeloni:
+    platform: angeloni_html
+    base_url: "https://www.angeloni.com.br"
+    cookie_domain: ".angeloni.com.br"
+    discovery: sitemap
+    sitemap_pattern: "/super/sitemap/product-{n}.xml"
+    sitemap_start_index: 0
+    global_discovery: true
+    batch_size: 20                # Smaller batches for HTML scraping
+    request_delay: 0.5            # Conservative for HTML scraping
+    max_workers: 1                # Sequential for now
+    regions:
+      # Florianópolis - Centro
+      florianopolis_centro:
+        cep: "88010-000"
+        sc: "1"
+        hub_id: "v2.6470C9DD8410520F44B2C757ECBDE327"
+      # Florianópolis - Continente
+      florianopolis_continente:
+        cep: "88085-000"
+        sc: "1"
+        hub_id: "v2.6EA065AD64AA626F42DFCA6CBE33D035"
+      # São José - Kobrasol
+      saojose_kobrasol:
+        cep: "88102-000"
+        sc: "1"
+        hub_id: "v2.6470C9DD8410520F44B2C757ECBDE327"
+
+  # --------------------------------------------------------------------------
+  # SUPER KOCH - HTML scraping (Osuper platform with auth-required GraphQL)
+  # --------------------------------------------------------------------------
+  superkoch:
+    platform: superkoch_html
+    base_url: "https://www.superkoch.com.br"
+    cookie_domain: ".superkoch.com.br"
+    discovery: sitemap
+    sitemap_pattern: "/sitemap.xml"
+    global_discovery: true
+    batch_size: 20                # HTML scraping batch size
+    request_delay: 0.5            # Conservative for HTML scraping
+    max_workers: 1                # Sequential for now
+    regions:
+      # Balneário Camboriú e Camboriú
+      balneario_camboriu:
+        store_id: "1415"
+        cep: "88340-152"
+        name: "Balneário Camboriú e Camboriú"
