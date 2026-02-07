@@ -208,10 +208,10 @@ def load_promo_data(stores_list, min_discount, hot_threshold):
         LIMIT 30
     """).df()
 
-    # Category breakdown
-    data['by_category'] = conn.execute(f"""
+    # Brand breakdown
+    data['by_brand'] = conn.execute(f"""
         SELECT
-            ap.category,
+            ap.brand,
             COUNT(DISTINCT ap.product_id) as promo_count,
             ROUND(AVG(ap.discount_percentage), 1) as avg_discount,
             ROUND(SUM(ap.regular_price - ap.promotional_price), 2) as total_savings
@@ -220,8 +220,8 @@ def load_promo_data(stores_list, min_discount, hot_threshold):
         WHERE ds.store_name IN ({stores_filter})
             AND ds.is_active = true
             AND ap.discount_percentage >= {min_discount}
-            AND ap.category IS NOT NULL
-        GROUP BY ap.category
+            AND ap.brand IS NOT NULL
+        GROUP BY ap.brand
         ORDER BY promo_count DESC
         LIMIT 20
     """).df()
@@ -516,34 +516,34 @@ if not data['best_savings'].empty:
 
 st.markdown("---")
 
-# ========== SECTION 7: CATEGORY BREAKDOWN ==========
-st.subheader("📦 Promoções por Categoria")
+# ========== SECTION 7: BRAND BREAKDOWN ==========
+st.subheader("🏷️ Promoções por Marca")
 
-if not data['by_category'].empty:
+if not data['by_brand'].empty:
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        fig_category = px.bar(
-            data['by_category'].head(10),
-            y='category',
+        fig_brand = px.bar(
+            data['by_brand'].head(10),
+            y='brand',
             x='promo_count',
             orientation='h',
             text='promo_count',
             color='avg_discount',
             color_continuous_scale='Viridis',
-            labels={'promo_count': 'Produtos em Promoção', 'category': 'Categoria', 'avg_discount': 'Desconto Médio %'}
+            labels={'promo_count': 'Produtos em Promoção', 'brand': 'Marca', 'avg_discount': 'Desconto Médio %'}
         )
-        fig_category.update_traces(textposition='outside')
-        fig_category.update_layout(
-            title="Top 10 Categorias com Mais Promoções",
+        fig_brand.update_traces(textposition='outside')
+        fig_brand.update_layout(
+            title="Top 10 Marcas com Mais Promoções",
             height=400
         )
-        st.plotly_chart(fig_category, use_container_width=True)
+        st.plotly_chart(fig_brand, use_container_width=True)
 
     with col2:
-        st.markdown("**Detalhes por Categoria**")
-        display_df = data['by_category'].head(10).copy()
-        display_df.columns = ['Categoria', 'Promoções', 'Desconto %', 'Economia']
+        st.markdown("**Detalhes por Marca**")
+        display_df = data['by_brand'].head(10).copy()
+        display_df.columns = ['Marca', 'Promoções', 'Desconto %', 'Economia']
         st.dataframe(
             display_df.style.format({
                 'Promoções': '{:,}',

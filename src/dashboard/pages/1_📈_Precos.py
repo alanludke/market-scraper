@@ -167,7 +167,7 @@ def load_price_data(days, stores_list, min_price, max_price):
             p.product_name,
             s.store_name,
             p.min_price,
-            p.category
+            p.brand
         FROM dev_local.tru_product p
         JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
         WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
@@ -184,7 +184,7 @@ def load_price_data(days, stores_list, min_price, max_price):
             p.product_name,
             s.store_name,
             p.min_price,
-            p.category
+            p.brand
         FROM dev_local.tru_product p
         JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
         WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
@@ -394,7 +394,7 @@ with col1:
     st.markdown("**💰 Top 20 Mais Baratos**")
     if not data['cheapest_products'].empty:
         display_df = data['cheapest_products'].copy()
-        display_df.columns = ['Produto', 'Loja', 'Preço', 'Categoria']
+        display_df.columns = ['Produto', 'Loja', 'Preço', 'Marca']
         st.dataframe(
             display_df.style.format({'Preço': 'R$ {:.2f}'}),
             use_container_width=True,
@@ -407,7 +407,7 @@ with col2:
     st.markdown("**💎 Top 20 Mais Caros**")
     if not data['expensive_products'].empty:
         display_df = data['expensive_products'].copy()
-        display_df.columns = ['Produto', 'Loja', 'Preço', 'Categoria']
+        display_df.columns = ['Produto', 'Loja', 'Preço', 'Marca']
         st.dataframe(
             display_df.style.format({'Preço': 'R$ {:.2f}'}),
             use_container_width=True,

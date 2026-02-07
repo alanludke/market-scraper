@@ -145,7 +145,7 @@ def load_competitive_data(days, min_store_count):
                 p.product_name,
                 s.store_name,
                 p.min_price,
-                p.category,
+                p.brand,
                 p.scraped_date
             FROM dev_local.tru_product p
             JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
@@ -156,14 +156,14 @@ def load_competitive_data(days, min_store_count):
         product_stats AS (
             SELECT
                 product_name,
-                category,
+                brand,
                 COUNT(DISTINCT store_name) as store_count,
                 MIN(min_price) as cheapest_price,
                 MAX(min_price) as most_expensive_price,
                 (MAX(min_price) - MIN(min_price)) as price_gap,
                 ((MAX(min_price) - MIN(min_price)) / NULLIF(MAX(min_price), 0) * 100) as gap_percentage
             FROM recent_products
-            GROUP BY product_name, category
+            GROUP BY product_name, brand
             HAVING COUNT(DISTINCT store_name) >= {min_store_count}
         ),
         cheapest_store AS (
@@ -192,7 +192,7 @@ def load_competitive_data(days, min_store_count):
         )
         SELECT
             ps.product_name,
-            ps.category,
+            ps.brand,
             ps.store_count,
             cs.cheapest_store,
             ps.cheapest_price,
@@ -207,11 +207,11 @@ def load_competitive_data(days, min_store_count):
         LIMIT 100
     """).df()
 
-    # Price leadership by category
-    data['category_leaders'] = conn.execute(f"""
+    # Price leadership by brand
+    data['brand_leaders'] = conn.execute(f"""
         WITH recent_products AS (
             SELECT
-                p.category,
+                p.brand,
                 s.store_name,
                 AVG(p.min_price) as avg_price
             FROM dev_local.tru_product p
@@ -219,24 +219,24 @@ def load_competitive_data(days, min_store_count):
             WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
                 AND p.min_price > 0
                 AND s.is_active = true
-                AND p.category IS NOT NULL
-            GROUP BY p.category, s.store_name
+                AND p.brand IS NOT NULL
+            GROUP BY p.brand, s.store_name
         ),
         ranked_stores AS (
             SELECT
-                category,
+                brand,
                 store_name,
                 avg_price,
-                ROW_NUMBER() OVER (PARTITION BY category ORDER BY avg_price ASC) as rank
+                ROW_NUMBER() OVER (PARTITION BY brand ORDER BY avg_price ASC) as rank
             FROM recent_products
         )
         SELECT
-            category,
+            brand,
             store_name as price_leader,
             ROUND(avg_price, 2) as avg_price
         FROM ranked_stores
         WHERE rank = 1
-        ORDER BY category
+        ORDER BY brand
         LIMIT 20
     """).df()
 
@@ -562,7 +562,7 @@ if not data['price_gaps'].empty:
     # Full table (expandable)
     with st.expander(f"📋 Ver todos os {len(data['price_gaps'])} produtos com price gap"):
         display_df = data['price_gaps'].copy()
-        display_df.columns = ['Produto', 'Categoria', 'Lojas', 'Mais Barato', 'Menor R$', 'Mais Caro', 'Maior R$', 'Gap R$', 'Gap %']
+        display_df.columns = ['Produto', 'Marca', 'Lojas', 'Mais Barato', 'Menor R$', 'Mais Caro', 'Maior R$', 'Gap R$', 'Gap %']
         st.dataframe(
             display_df.style.format({
                 'Menor R$': 'R$ {:.2f}',
@@ -578,21 +578,21 @@ else:
 
 st.markdown("---")
 
-# ========== SECTION 6: CATEGORY PRICE LEADERS ==========
-st.subheader("🏅 Liderança de Preço por Categoria")
+# ========== SECTION 6: BRAND PRICE LEADERS ==========
+st.subheader("🏅 Liderança de Preço por Marca")
 
-if not data['category_leaders'].empty:
-    st.markdown("**Qual loja tem o menor preço médio em cada categoria**")
+if not data['brand_leaders'].empty:
+    st.markdown("**Qual loja tem o menor preço médio em cada marca**")
 
     # Group by leader to show dominance
-    leader_count = data['category_leaders']['price_leader'].value_counts()
+    leader_count = data['brand_leaders']['price_leader'].value_counts()
 
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        # Category leadership table
-        display_df = data['category_leaders'].copy()
-        display_df.columns = ['Categoria', 'Líder de Preço', 'Preço Médio']
+        # Brand leadership table
+        display_df = data['brand_leaders'].copy()
+        display_df.columns = ['Marca', 'Líder de Preço', 'Preço Médio']
         st.dataframe(
             display_df.style.format({'Preço Médio': 'R$ {:.2f}'}),
             use_container_width=True,
@@ -605,7 +605,7 @@ if not data['category_leaders'].empty:
             leader_count.reset_index(),
             values='count',
             names='price_leader',
-            title="Distribuição de Liderança por Categoria"
+            title="Distribuição de Liderança por Marca"
         )
         fig_dominance.update_layout(height=500)
         st.plotly_chart(fig_dominance, use_container_width=True)
@@ -615,7 +615,7 @@ if not data['category_leaders'].empty:
     dominant_count = leader_count.iloc[0]
     st.markdown(f"""
     <div class="insight-box">
-    💡 <b>Insight:</b> {dominant_store} lidera em {dominant_count} categoria(s),
+    💡 <b>Insight:</b> {dominant_store} lidera em {dominant_count} marca(s),
     demonstrando forte competitividade em múltiplos segmentos
     </div>
     """, unsafe_allow_html=True)
