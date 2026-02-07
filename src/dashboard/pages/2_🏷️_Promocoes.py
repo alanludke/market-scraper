@@ -440,7 +440,7 @@ if not data['hot_deals'].empty:
                 'Preço Promo': 'R$ {:.2f}',
                 'Desconto %': '{:.1f}%',
                 'Economia': 'R$ {:.2f}'
-            }).background_gradient(subset=['Desconto %'], cmap='Reds'),
+            }),
             use_container_width=True
         )
 
@@ -454,7 +454,7 @@ if not data['hot_deals'].empty:
                 'Preço Promo': 'R$ {:.2f}',
                 'Desconto %': '{:.1f}%',
                 'Economia': 'R$ {:.2f}'
-            }).background_gradient(subset=['Economia'], cmap='Greens'),
+            }),
             use_container_width=True
         )
 

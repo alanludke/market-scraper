@@ -512,7 +512,7 @@ if not data['win_rate'].empty:
         display_df.style.format({
             'Vitórias': '{:,}',
             'Win Rate (%)': '{:.1f}%'
-        }).background_gradient(subset=['Win Rate (%)'], cmap='Greens'),
+        }),
         use_container_width=True
     )
 
@@ -554,7 +554,7 @@ if not data['price_gaps'].empty:
             top_gaps_display.style.format({
                 'Menor Preço': 'R$ {:.2f}',
                 'Economia': 'R$ {:.2f}'
-            }).background_gradient(subset=['Economia'], cmap='Greens'),
+            }),
             use_container_width=True,
             height=600
         )
