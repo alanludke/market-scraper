@@ -21,6 +21,7 @@ reports/
 
 # Environment & secrets
 .env
+azure_analytics_url.txt
 
 # Python
 __pycache__/

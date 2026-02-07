@@ -182,13 +182,46 @@ def cmd_query(args, config):
 
 
 def cmd_upload(args, config):
-    from src.storage.azure_blob import BlobUploader
-    uploader = BlobUploader()
+    from src.storage.azure_blob import LakehouseSync
+    sync = LakehouseSync()
     if args.store:
-        uploader.upload_latest(args.store)
+        # Legacy: upload single store bronze data
+        sync.sync_bronze()
     else:
-        for store_name in config["stores"]:
-            uploader.upload_latest(store_name)
+        sync.sync_bronze()
+
+
+def cmd_sync(args, config):
+    from src.storage.azure_blob import LakehouseSync
+    sync = LakehouseSync()
+
+    layer = args.layer or "all"
+
+    if layer == "status":
+        status = sync.status()
+        print(f"\n  Lakehouse Sync Status")
+        print(f"  {'─' * 40}")
+        print(f"  Local files:   {status['local_files']:,}")
+        print(f"  Synced:        {status['synced_files']:,}")
+        print(f"  Pending:       {status['pending_files']:,}")
+        print(f"  Last sync:     {status['last_sync'] or 'never'}")
+        return
+
+    if layer in ("bronze", "all"):
+        logger.info("Syncing bronze layer...")
+        stats = sync.sync_bronze(force=args.force)
+        print(f"\n  Bronze: {stats['uploaded']} uploaded, {stats['skipped']} skipped, {stats['errors']} errors")
+
+    if layer in ("analytics", "all"):
+        logger.info("Syncing analytics layer...")
+        sas_url = sync.sync_analytics()
+        if sas_url:
+            print(f"\n  Analytics: uploaded successfully")
+            print(f"  SAS URL saved to: azure_analytics_url.txt")
+
+    if layer not in ("bronze", "analytics", "all", "status"):
+        print(f"  Unknown layer: '{layer}'. Use: bronze, analytics, all, status")
+        sys.exit(1)
 
 
 # ── Argument parser ─────────────────────────────────────────
@@ -232,9 +265,23 @@ def build_parser():
     p_query = sub.add_parser("query", help="Run DuckDB SQL query")
     p_query.add_argument("sql", help="SQL query string")
 
-    # upload
-    p_upload = sub.add_parser("upload", help="Upload data to Azure Blob Storage")
+    # upload (legacy)
+    p_upload = sub.add_parser("upload", help="Upload data to Azure Blob Storage (legacy)")
     p_upload.add_argument("store", nargs="?", help="Store name (all if omitted)")
+
+    # sync (lakehouse)
+    p_sync = sub.add_parser("sync", help="Sync data to Azure Lakehouse")
+    p_sync.add_argument(
+        "--layer",
+        choices=["bronze", "analytics", "all", "status"],
+        default="all",
+        help="Layer to sync (default: all)",
+    )
+    p_sync.add_argument(
+        "--force",
+        action="store_true",
+        help="Force re-upload all files (ignore manifest)",
+    )
 
     return parser
 
@@ -258,6 +305,7 @@ if __name__ == "__main__":
         "report": cmd_report,
         "query": cmd_query,
         "upload": cmd_upload,
+        "sync": cmd_sync,
     }
 
     commands[args.command](args, config)

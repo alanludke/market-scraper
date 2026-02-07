@@ -15,23 +15,42 @@ def get_duckdb_connection():
     Get DuckDB connection with automatic database download.
 
     Priority order:
-    1. Local file (data/analytics.duckdb)
-    2. Download from URL (if DB_DOWNLOAD_URL secret is set)
+    1. Download from URL if secret changed (DB_DOWNLOAD_URL)
+    2. Local file (data/analytics.duckdb) if URL unchanged
     3. Sample/demo database (if available)
 
     Returns:
         duckdb.Connection: Read-only connection to analytics database
     """
     db_path = Path("data/analytics.duckdb")
+    url_cache_path = Path("data/.db_url_cache")
 
-    # Check if database exists locally
-    if db_path.exists():
+    # Check if URL changed (force re-download)
+    current_url = st.secrets.get("db_download_url", "")
+    cached_url = ""
+
+    if url_cache_path.exists():
+        cached_url = url_cache_path.read_text().strip()
+
+    url_changed = current_url != cached_url and current_url != ""
+
+    # If URL changed, delete old database to force re-download
+    if url_changed and db_path.exists():
+        st.info("🔄 New database version detected. Downloading updated data...")
+        db_path.unlink()
+
+    # Check if database exists locally (and URL hasn't changed)
+    if db_path.exists() and not url_changed:
         st.success(f"✅ Database loaded: {db_path} ({db_path.stat().st_size / 1024 / 1024:.1f} MB)")
         return duckdb.connect(str(db_path), read_only=True)
 
     # Try to download from configured URL
     if "db_download_url" in st.secrets:
-        return _download_and_connect(db_path, st.secrets["db_download_url"])
+        conn = _download_and_connect(db_path, st.secrets["db_download_url"])
+        # Cache URL after successful download
+        url_cache_path.parent.mkdir(parents=True, exist_ok=True)
+        url_cache_path.write_text(st.secrets["db_download_url"])
+        return conn
 
     # Check for alternative paths (for local development)
     alternative_paths = [
