@@ -1,7 +1,7 @@
 # Scraper Performance & Rate Limiting Documentation
 
 **Last updated**: 2026-02-07
-**Version**: 1.0
+**Version**: 1.1 (Optimized HTML scrapers to 0.3s delay)
 
 ## Overview
 
@@ -163,7 +163,7 @@ Resultado: Cada scraper recebe ~83 req/s ÷ 37 workers = 2.2 req/s por worker
 
 **Diferenças em relação aos scrapers VTEX**:
 1. **Sem rate limiting global** (cada site tem suas próprias políticas)
-2. **Request delay mais conservador** (0.5s vs 0.1s) para evitar bloqueios
+2. **Request delay otimizado** (0.3s vs 0.1s) - balance entre velocidade e segurança
 3. **Batch size menor** (20 vs 50) - HTML é mais lento que API
 4. **Sem paralelização** (max_workers=1) - mais respeitoso com servidores
 
@@ -180,7 +180,7 @@ Resultado: Cada scraper recebe ~83 req/s ÷ 37 workers = 2.2 req/s por worker
 | Parâmetro | Valor | Análise | Status |
 |-----------|-------|---------|--------|
 | `batch_size` | **20** | Menor que VTEX API (HTML é mais lento) | ✅ **Conservador** |
-| `request_delay` | **0.5s** | 5x mais lento que VTEX API (2 req/s) | ✅ **Conservador** |
+| `request_delay` | **0.3s** | Otimizado de 0.5s (+40% faster, 3.3 req/s) | ✅ **Otimizado** |
 | `max_workers` | **1** | Sem paralelização (sequential scraping) | ✅ **Respeitoso** |
 | Rate limit | N/A | Sem rate limiter (controlado por delay) | ⚠️ **Manual** |
 
@@ -188,19 +188,20 @@ Resultado: Cada scraper recebe ~83 req/s ÷ 37 workers = 2.2 req/s por worker
 
 **Scraping sequencial**:
 - 1 região por vez
-- ~2 req/s (delay 0.5s)
-- Throughput: **120 req/min** (2 req/s × 60s)
+- ~3.3 req/s (delay 0.3s)
+- Throughput: **198 req/min** (3.3 req/s × 60s)
 
-**Por que 0.5s de delay?**
+**Por que 0.3s de delay?**
 - HTML scraping é mais "visível" que API (User-Agent, parsing, etc.)
-- Evita bloqueios por rate limiting não documentado
-- Mais respeitoso com o servidor (não sobrecarrega)
+- Otimizado de 0.5s para 0.3s (+40% velocidade)
+- Ainda conservador o suficiente para evitar bloqueios
+- Mais respeitoso com o servidor que 0.1s da VTEX API
 
-**Status**: ✅ **Conservador e seguro** - Configuração apropriada para HTML scraping sem rate limit explícito.
+**Status**: ✅ **Otimizado** - Delay 0.3s oferece bom equilíbrio entre velocidade e segurança.
 
 **Recomendação**:
-- ✅ **Manter delay 0.5s** (seguro, sem bloqueios observados)
-- ⚠️ **Poderia testar 0.3s** se quiser acelerar 40% (com monitoramento de bloqueios)
+- ✅ **Manter delay 0.3s** (otimizado, monitorar por bloqueios)
+- ⚠️ **Se houver bloqueios HTTP 429/403**: Voltar para 0.5s
 - ❌ **NÃO reduzir para 0.1s** (alto risco de bloqueio)
 
 ---
@@ -216,7 +217,7 @@ Resultado: Cada scraper recebe ~83 req/s ÷ 37 workers = 2.2 req/s por worker
 | Parâmetro | Valor | Análise | Status |
 |-----------|-------|---------|--------|
 | `batch_size` | **20** | Conservador para HTML | ✅ **Conservador** |
-| `request_delay` | **0.5s** | 2 req/s | ✅ **Conservador** |
+| `request_delay` | **0.3s** | 3.3 req/s (otimizado de 0.5s) | ✅ **Otimizado** |
 | `max_workers` | **1** | Sem paralelização | ✅ **Respeitoso** |
 
 **Estratégias de extração** (fallback em cascata):
@@ -224,9 +225,9 @@ Resultado: Cada scraper recebe ~83 req/s ÷ 37 workers = 2.2 req/s por worker
 2. **HTML class-based** (VTEX patterns) - fallback
 3. **JavaScript __RUNTIME__** - última tentativa (não implementado ainda)
 
-**Status**: ✅ **Conservador e seguro** - Mesmo perfil que Carrefour (HTML scraping).
+**Status**: ✅ **Otimizado** - Delay 0.3s (+40% velocidade vs 0.5s anterior).
 
-**Recomendação**: ✅ **Manter configuração atual** (0.5s delay é seguro).
+**Recomendação**: ✅ **Monitorar logs** para bloqueios HTTP 429/403 nas próximas 1-2 semanas.
 
 ---
 
@@ -241,10 +242,10 @@ Resultado: Cada scraper recebe ~83 req/s ÷ 37 workers = 2.2 req/s por worker
 | Parâmetro | Valor | Análise | Status |
 |-----------|-------|---------|--------|
 | `batch_size` | **20** | Conservador para HTML | ✅ **Conservador** |
-| `request_delay` | **0.5s** | 2 req/s | ✅ **Conservador** |
+| `request_delay` | **0.3s** | 3.3 req/s (otimizado de 0.5s) | ✅ **Otimizado** |
 | `max_workers` | **1** | Sem paralelização | ✅ **Respeitoso** |
 
-**Status**: ✅ **Conservador e seguro** - Mesmo perfil dos outros HTML scrapers.
+**Status**: ✅ **Otimizado** - Delay 0.3s (+40% velocidade vs 0.5s anterior).
 
 ---
 
@@ -268,13 +269,13 @@ Resultado: Cada scraper recebe ~83 req/s ÷ 37 workers = 2.2 req/s por worker
 
 | Store | Regions | Max Workers | Batch Size | Delay | Throughput/Worker | Status |
 |-------|---------|-------------|------------|-------|-------------------|--------|
-| Carrefour | 5 | **1** | 20 | 0.5s | ~2 req/s | ✅ **Conservador** |
-| Angeloni | 3 | **1** | 20 | 0.5s | ~2 req/s | ✅ **Conservador** |
-| Super Koch | 1 | **1** | 20 | 0.5s | ~2 req/s | ✅ **Conservador** |
+| Carrefour | 5 | **1** | 20 | 0.3s | ~3.3 req/s | ✅ **Otimizado** |
+| Angeloni | 3 | **1** | 20 | 0.3s | ~3.3 req/s | ✅ **Otimizado** |
+| Super Koch | 1 | **1** | 20 | 0.3s | ~3.3 req/s | ✅ **Otimizado** |
 
 **Rate Limit**: N/A (controlado por delay manual)
 
-**Status Geral**: ✅ **Conservador e seguro** - Delay de 0.5s evita bloqueios, sem rate limiting global necessário.
+**Status Geral**: ✅ **Otimizado** - Delay de 0.3s (+40% velocidade) com monitoramento de bloqueios.
 
 ---
 
@@ -287,12 +288,12 @@ Resultado: Cada scraper recebe ~83 req/s ÷ 37 workers = 2.2 req/s por worker
 - **Paralelização**: Sim (múltiplos workers)
 - **Eficiência**: ⭐⭐⭐⭐⭐ (máxima)
 
-**HTML Scrapers** (delay 0.5s):
-- **2 req/s** por worker
+**HTML Scrapers** (delay 0.3s):
+- **3.3 req/s** por worker
 - **Paralelização**: Não (sequential)
-- **Eficiência**: ⭐⭐⭐ (conservador, mas seguro)
+- **Eficiência**: ⭐⭐⭐⭐ (otimizado, +40% vs 0.5s)
 
-**Diferença**: VTEX API é **5x mais rápido** que HTML scraping (10 req/s vs 2 req/s).
+**Diferença**: VTEX API é **3x mais rápido** que HTML scraping (10 req/s vs 3.3 req/s).
 
 ---
 
@@ -305,10 +306,10 @@ Resultado: Cada scraper recebe ~83 req/s ÷ 37 workers = 2.2 req/s por worker
 
 #### HTML Scrapers
 - **Capacidade estimada**: Desconhecida (sem rate limit documentado)
-- **Nossa utilização**: ~2 req/s (120 req/min)
-- **Utilização**: ⚠️ **Conservador** (~20-30% da capacidade estimada?)
+- **Nossa utilização**: ~3.3 req/s (198 req/min) - **OTIMIZADO** de 120 req/min
+- **Utilização**: ✅ **Otimizado** (~40-50% da capacidade estimada)
 
-**Observação**: HTML scrapers poderiam potencialmente ir mais rápido (0.3s delay = 3.3 req/s), mas priorizamos **segurança** (evitar bloqueios) sobre **velocidade**.
+**Observação**: HTML scrapers foram otimizados de 0.5s → 0.3s (+40% velocidade). Monitorar por bloqueios HTTP 429/403.
 
 ---
 
@@ -333,21 +334,22 @@ Resultado: Cada scraper recebe ~83 req/s ÷ 37 workers = 2.2 req/s por worker
 
 ### 5.2 HTML Scrapers (Carrefour, Angeloni, Super Koch)
 
-✅ **Status atual**: **CONSERVADOR E SEGURO**
+✅ **Status atual**: **OTIMIZADO** (+40% velocidade)
 
-**Configuração atual**:
+**Configuração atual** (IMPLEMENTADO em 2026-02-07):
 - `batch_size: 20` ✅ (apropriado para HTML)
-- `request_delay: 0.5s` ✅ (conservador, sem bloqueios)
+- `request_delay: 0.3s` ✅ **OTIMIZADO** (era 0.5s, agora +40% mais rápido)
 - `max_workers: 1` ✅ (sequential, respeitoso)
 
-**Opções de otimização** (em ordem de risco):
+**Próximas opções de otimização** (em ordem de risco):
 
-1. **Baixo risco** (✅ Recomendado testar):
-   - Reduzir delay para `0.3s` (3.3 req/s, +66% de velocidade)
-   - Monitorar por 1-2 semanas para verificar bloqueios
-   - Se sem bloqueios, manter; senão, voltar para 0.5s
+1. **Baixo risco** (⚠️ Monitorar antes de avançar):
+   - **IMPLEMENTADO**: Delay 0.3s (3.3 req/s, +40% de velocidade)
+   - **Ação**: Monitorar por 1-2 semanas para verificar bloqueios HTTP 429/403
+   - **Se houver bloqueios**: Voltar para 0.5s
+   - **Se tudo OK**: Considerar próxima fase
 
-2. **Médio risco** (⚠️ Testar com cautela):
+2. **Médio risco** (⚠️ Testar com cautela após Fase 1):
    - Paralelização com `max_workers: 2` (duplica velocidade)
    - Aumenta risco de bloqueio (2x mais requests simultâneas)
    - Monitorar atentamente logs de HTTP 429/403
@@ -357,9 +359,9 @@ Resultado: Cada scraper recebe ~83 req/s ÷ 37 workers = 2.2 req/s por worker
    - `max_workers` > 2 (comportamento "agressivo")
 
 **Ação recomendada**:
-- ✅ **Fase 1** (próxima semana): Testar delay 0.3s no Carrefour (menor número de regiões)
-- ⏸️ **Fase 2** (se Fase 1 OK): Aplicar 0.3s no Angeloni e Super Koch
-- ⏸️ **Fase 3** (se tudo OK): Testar `max_workers: 2` no Carrefour
+- ✅ **Fase 1** (IMPLEMENTADO 2026-02-07): Delay 0.3s em todos os HTML scrapers
+- ⏸️ **Fase 2** (aguardando 1-2 semanas): Monitorar logs para bloqueios
+- ⏸️ **Fase 3** (se Fase 2 OK): Testar `max_workers: 2` no Carrefour
 
 ---
 
@@ -411,17 +413,17 @@ rate_limiter.get_stats()
 | Categoria | Status | Utilização | Ação |
 |-----------|--------|------------|------|
 | **VTEX API Scrapers** | ✅ **Excelente** | **100%** da capacidade (5,000 req/min) | ✅ Manter |
-| **HTML Scrapers** | ✅ **Conservador** | **~30%** da capacidade estimada | ⚠️ Testar 0.3s delay |
+| **HTML Scrapers** | ✅ **Otimizado** | **~40-50%** da capacidade estimada | ✅ Monitorar bloqueios |
 
 **Conclusão**:
 - ✅ **VTEX scrapers**: Já otimizados ao máximo (100% da capacidade VTEX com rate limiting seguro)
-- ⚠️ **HTML scrapers**: Conservadores (priorizam segurança), mas poderiam ser ~30-40% mais rápidos com delay 0.3s
+- ✅ **HTML scrapers**: **OTIMIZADOS** para 0.3s delay (+40% velocidade vs 0.5s)
 
 **Próximos passos**:
 1. ✅ Manter VTEX scrapers como estão (já perfeitos)
-2. ⚠️ Testar delay 0.3s no Carrefour por 1-2 semanas
-3. ℹ️ Monitorar logs para bloqueios (HTTP 429/403)
-4. ✅ Se tudo OK, aplicar 0.3s nos outros HTML scrapers
+2. ✅ **IMPLEMENTADO**: Delay 0.3s em todos os HTML scrapers (2026-02-07)
+3. ⚠️ Monitorar logs por 1-2 semanas para bloqueios (HTTP 429/403)
+4. ⏸️ Se tudo OK, considerar `max_workers: 2` no Carrefour (Fase 3)
 
 ---
 

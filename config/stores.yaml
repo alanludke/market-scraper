@@ -220,7 +220,7 @@ stores:
     sitemap_start_index: 1                 # Carrefour sitemaps start at 1, not 0
     global_discovery: true
     batch_size: 20                         # Smaller batches for HTML scraping (slower)
-    request_delay: 0.5                     # Slower to avoid rate limiting on HTML pages
+    request_delay: 0.3                     # Optimized: 0.5s → 0.3s (+40% faster)
     max_workers: 1                         # No parallel scraping (HTML is slower, more respectful)
     regions:
       # Florianópolis - Main stores
@@ -260,7 +260,7 @@ stores:
     sitemap_start_index: 0
     global_discovery: true
     batch_size: 20                # Smaller batches for HTML scraping
-    request_delay: 0.5            # Conservative for HTML scraping
+    request_delay: 0.3            # Optimized: 0.5s → 0.3s (+40% faster)
     max_workers: 1                # Sequential for now
     regions:
       # Florianópolis - Centro
@@ -290,7 +290,7 @@ stores:
     sitemap_pattern: "/sitemap.xml"
     global_discovery: true
     batch_size: 20                # HTML scraping batch size
-    request_delay: 0.5            # Conservative for HTML scraping
+    request_delay: 0.3            # Optimized: 0.5s → 0.3s (+40% faster)
     max_workers: 1                # Sequential for now
     regions:
       # Balneário Camboriú e Camboriú
