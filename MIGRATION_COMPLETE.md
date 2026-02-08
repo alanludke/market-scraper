@@ -228,10 +228,11 @@ data/bronze/
 - [x] Documentar processo completo
 
 ### 📋 Pendentes
-- [ ] Investigar 726 EANs duplicados em dim_ean (qualidade de dados)
-- [ ] Fazer backup do `/archive` (opcional)
-- [ ] Deletar `/archive` após confirmação (opcional)
 - [ ] Atualizar dashboards com dados históricos (2.4M registros)
+
+### ✅ Completados Adicionalmente
+- [x] **Investigar EANs duplicados** - 960 duplicatas eliminadas (dim_ean: 31,758 → 30,798 registros)
+- [x] **Deletar /archive** - 12 GB liberados permanentemente (dados já migrados e validados)
 
 ## 🗂️ Arquivos Criados/Modificados
 
