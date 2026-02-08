@@ -9,8 +9,11 @@ archive/
 # DuckDB
 *.duckdb
 *.duckdb.wal
-!data/analytics.duckdb  # Exception: Track via LFS
 duckdb_tmp/
+
+# Analytics databases (generated, should not be tracked)
+src/analytics/*.duckdb
+src/analytics/*.duckdb.wal
 
 # Logs (auto-generated)
 logs/
@@ -22,6 +25,8 @@ reports/
 # Environment & secrets
 .env
 azure_analytics_url.txt
+reseach.txt
+nul
 
 # Python
 __pycache__/
@@ -50,3 +55,11 @@ src/transform/dbt_project/dbt_packages/
 
 # Indicium repos (local reference only)
 indicium_repos
+# Test coverage
+htmlcov/
+tests/htmlcov/
+.coverage
+.coverage.*
+
+# Pytest cache
+.pytest_cache/

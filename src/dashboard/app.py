@@ -341,7 +341,7 @@ def main():
             )
             fig_stores.update_traces(texttemplate='R$ %{text:.2f}', textposition='outside')
             fig_stores.update_layout(height=300, showlegend=False)
-            st.plotly_chart(fig_stores, use_container_width=True)
+            st.plotly_chart(fig_stores, width="stretch")
 
     with col2:
         st.markdown("#### 🏷️ Liderança em Promoções")
@@ -365,7 +365,7 @@ def main():
             )
             fig_promo.update_traces(textposition='outside')
             fig_promo.update_layout(height=300, showlegend=False)
-            st.plotly_chart(fig_promo, use_container_width=True)
+            st.plotly_chart(fig_promo, width="stretch")
 
     st.markdown("---")
 
@@ -383,7 +383,7 @@ def main():
         )
         fig_trend.update_traces(line_color='#1f77b4', line_width=3)
         fig_trend.update_layout(height=350, hovermode='x unified')
-        st.plotly_chart(fig_trend, use_container_width=True)
+        st.plotly_chart(fig_trend, width="stretch")
 
         # Automated insights
         if len(data['price_evolution']) >= 2:

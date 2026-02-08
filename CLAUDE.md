@@ -291,8 +291,8 @@ stomarketscraper/
 #### Regional Supermarket Chains (6 stores)
 - [x] **Angeloni** (angeloni.com.br) - Multicategory, quality benchmark ✅ IMPLEMENTED (Feb 2026)
 - [x] **Super Koch** (superkoch.com.br) - Atacarejo, Balneário Camboriú + Camboriú ✅ IMPLEMENTED (Feb 2026)
+- [x] **Hippo Supermercados** (hipposupermercados.com.br) - Premium/Gourmet, Floripa Centro ✅ IMPLEMENTED (Feb 2026)
 - [ ] **Brasil Atacadista** (brasilatacadista.com.br) - Atacarejo, Island + Biguaçu
-- [ ] **Hippo Supermercados** (hipposupermercados.com.br) - Premium/Gourmet, Center
 - [ ] **Hiper Select** (hiperselectsupermercados.com.br) - Neighborhood retail
 - [ ] **Manentti** (manentti.com.br) - Regional, São José industrial
 

@@ -59,7 +59,7 @@ logger = logging.getLogger("market_scraper")
 
 
 class MarketAnalytics:
-    def __init__(self, db_path: str = "market_data.duckdb"):
+    def __init__(self, db_path: str = "src/analytics/market_data.duckdb"):
         self.con = duckdb.connect(db_path, config={
             "temp_directory": "duckdb_tmp",
             "memory_limit": "4GB",

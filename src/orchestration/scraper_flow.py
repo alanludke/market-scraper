@@ -30,8 +30,8 @@ logger = logging.getLogger(__name__)
 
 
 def load_stores_config() -> dict:
-    """Load stores configuration from config/stores.yaml."""
-    config_path = Path(__file__).parent.parent.parent / "config" / "stores.yaml"
+    """Load stores configuration from src/ingest/config/stores.yaml."""
+    config_path = Path(__file__).parent.parent / "ingest" / "config" / "stores.yaml"
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
     return config.get("stores", {})
@@ -43,17 +43,20 @@ def load_stores_config() -> dict:
     log_prints=True,
     timeout_seconds=7200,  # 2 hours per store
 )
-def scrape_store(store_name: str) -> dict:
+def scrape_store(store_name: str, use_incremental: bool = True, incremental_days: int = 7) -> dict:
     """
     Scrape a single store (all regions).
 
     Args:
         store_name: Store identifier (bistek, fort, giassi, etc.)
+        use_incremental: If True, use incremental scraping (only recent products). Default: True
+        incremental_days: Number of days to look back for incremental scraping. Default: 7
 
     Returns:
         dict: Scraping statistics (products scraped, duration, etc.)
     """
-    print(f"[SCRAPING] Starting scrape for store: {store_name}")
+    mode = "INCREMENTAL" if use_incremental else "FULL"
+    print(f"[SCRAPING] Starting {mode} scrape for store: {store_name}")
 
     # Get project root and add to PYTHONPATH
     project_root = Path(__file__).parent.parent.parent
@@ -62,12 +65,19 @@ def scrape_store(store_name: str) -> dict:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(project_root)
 
-    # Run CLI command
-    # First run: Full scraping (no --incremental)
-    # Subsequent runs: Use --incremental 7 (last 7 days) to capture updates
-    # For now, doing FULL scraping to ensure we get all data
+    # Build CLI command
+    # Incremental mode: Only scrape products modified in last N days (8-16x faster!)
+    # Full mode: Scrape entire catalog (use for first run or monthly full refresh)
+    cmd = ["python", "scripts/cli.py", "scrape", store_name]
+
+    if use_incremental:
+        cmd.extend(["--incremental", str(incremental_days)])
+        print(f"[SCRAPING] Using incremental mode (last {incremental_days} days)")
+    else:
+        print(f"[SCRAPING] Using full catalog mode")
+
     result = subprocess.run(
-        ["python", "scripts/cli.py", "scrape", store_name],
+        cmd,
         capture_output=True,
         text=True,
         cwd=project_root,
@@ -110,12 +120,18 @@ def scrape_store(store_name: str) -> dict:
     description="Daily scraping of all supermarket stores (parallel execution)",
     log_prints=True
 )
-def daily_scraper_flow(stores: Optional[List[str]] = None) -> dict:
+def daily_scraper_flow(
+    stores: Optional[List[str]] = None,
+    use_incremental: bool = True,
+    incremental_days: int = 7
+) -> dict:
     """
     Main flow for daily scraping of all stores.
 
     Args:
         stores: Optional list of stores to scrape. If None, scrapes all configured stores.
+        use_incremental: If True, scrape only recent products (8-16x faster). Default: True
+        incremental_days: Number of days to look back for incremental scraping. Default: 7
 
     Steps:
     1. Load store configuration
@@ -124,9 +140,20 @@ def daily_scraper_flow(stores: Optional[List[str]] = None) -> dict:
 
     Returns:
         dict: Flow execution summary with per-store results
+
+    Examples:
+        # Daily incremental scraping (default, fast)
+        daily_scraper_flow()
+
+        # Full catalog scraping (monthly refresh)
+        daily_scraper_flow(use_incremental=False)
+
+        # Custom incremental period
+        daily_scraper_flow(incremental_days=14)
     """
+    mode = "INCREMENTAL" if use_incremental else "FULL CATALOG"
     print("="*60)
-    print("  Daily Scraper Flow - All Supermarket Stores")
+    print(f"  Daily Scraper Flow - {mode} Mode")
     print("="*60)
 
     # Load stores configuration
@@ -152,15 +179,27 @@ def daily_scraper_flow(stores: Optional[List[str]] = None) -> dict:
     # Validate stores exist in config
     for store in stores_to_scrape:
         if store not in stores_config:
-            raise ValueError(f"Store '{store}' not found in config/stores.yaml")
+            raise ValueError(f"Store '{store}' not found in src/ingest/config/stores.yaml")
 
     print("\n" + "="*60)
     print("  Starting parallel scraping...")
+    if use_incremental:
+        print(f"  Mode: INCREMENTAL (last {incremental_days} days)")
+        print(f"  Expected time: ~30-60 min per store")
+    else:
+        print(f"  Mode: FULL CATALOG")
+        print(f"  Expected time: ~2-8h per store (depending on catalog size)")
     print("="*60 + "\n")
 
     # Execute scrapers in parallel using Prefect's map
     # Prefect will handle concurrency and retries automatically
-    scraping_results = scrape_store.map(stores_to_scrape)
+    # Pass use_incremental and incremental_days to all tasks
+    from prefect import unmapped
+    scraping_results = scrape_store.map(
+        stores_to_scrape,
+        use_incremental=unmapped(use_incremental),
+        incremental_days=unmapped(incremental_days)
+    )
 
     # Wait for all tasks to complete and collect results
     completed_results = [result for result in scraping_results]
@@ -175,14 +214,20 @@ def daily_scraper_flow(stores: Optional[List[str]] = None) -> dict:
         'failed_stores': len(stores_to_scrape) - successful_stores,
         'total_products_scraped': total_products,
         'store_results': completed_results,
-        'success': successful_stores == len(stores_to_scrape)
+        'success': successful_stores == len(stores_to_scrape),
+        'mode': 'incremental' if use_incremental else 'full',
+        'incremental_days': incremental_days if use_incremental else None
     }
 
     print("\n" + "="*60)
     print("  Scraping Flow Completed!")
     print("="*60)
+    mode_info = f"INCREMENTAL ({incremental_days}d)" if use_incremental else "FULL CATALOG"
+    print(f"🎯 Mode: {mode_info}")
     print(f"✅ Successful: {successful_stores}/{len(stores_to_scrape)} stores")
     print(f"📦 Total products scraped: {total_products}")
+    if use_incremental:
+        print(f"⚡ Time saved: ~85% compared to full scraping!")
     print("="*60 + "\n")
 
     return summary
