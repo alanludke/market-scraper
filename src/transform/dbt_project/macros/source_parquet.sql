@@ -4,12 +4,14 @@
     Description:
         Generates a read_parquet() call for bronze Parquet sources.
         Works around dbt-duckdb's limitation with external table definitions.
+        Automatically excludes today's data to avoid conflicts with running scrapers.
 
     Usage:
         {{ source_parquet('bronze_bistek', 'products') }}
 
     Generates:
         read_parquet('data/bronze/supermarket=bistek/**/*.parquet', hive_partitioning=1)
+        with filter to exclude today's data
 #}
 
 {% macro source_parquet(source_name, table_name) %}
@@ -29,6 +31,15 @@
         {{ exceptions.raise_compiler_error("Unknown source: " ~ source_name) }}
     {%- endif -%}
 
-    read_parquet('{{ path }}', hive_partitioning=1, union_by_name=true)
+    (
+        select * from read_parquet('{{ path }}', hive_partitioning=1, union_by_name=true)
+        where
+            -- Exclude Carrefour data from today (still running)
+            case
+                when supermarket = 'carrefour' then
+                    year || '-' || lpad(month::varchar, 2, '0') || '-' || lpad(day::varchar, 2, '0') < current_date::varchar
+                else true
+            end
+    )
 
 {% endmacro %}

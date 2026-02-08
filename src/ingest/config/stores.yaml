@@ -1,0 +1,327 @@
+# ============================================================================
+# SUPERMARKET CONFIGURATION
+# ============================================================================
+# To add a new VTEX store: copy a block and adjust the values.
+# For a NON-VTEX store: create the block, set platform: "custom",
+# and implement the corresponding subclass in src/scrapers/.
+
+stores:
+
+  # --------------------------------------------------------------------------
+  # BISTEK - Discovery via sitemap, scrape per batch of product IDs
+  # --------------------------------------------------------------------------
+  bistek:
+    platform: vtex
+    base_url: "https://www.bistek.com.br"
+    cookie_domain: ".bistek.com.br"
+    discovery: sitemap
+    sitemap_pattern: "/sitemap/product-{n}.xml"
+    global_discovery: true
+    batch_size: 50
+    request_delay: 0.1             # Optimized: was 0.3s (3x faster!)
+    max_workers: 13                # Parallel regions (NEW: 13 regions in parallel!)
+    regions:
+      florianopolis_costeira:
+        cep: "88047-010"
+        sc: "1"
+        hub_id: "v2.1E10CE150EA319FED789DC6BE7C290F5"
+      criciuma_centro:
+        cep: "88802-000"
+        sc: "1"
+        hub_id: "v2.1ACA29C622CF7C99ED59045C6074B6C9"
+      lages_coral:
+        cep: "88523-000"
+        sc: "1"
+        hub_id: "v2.191BE3A849CD16A9CEFF2AB55E90E6D7"
+      blumenau_itoupava:
+        cep: "89052-050"
+        sc: "1"
+        hub_id: "v2.314053D5BCFB5A6D4C5EA7ED6DF3C455"
+      itajai_saojoao:
+        cep: "88304-101"
+        sc: "1"
+        hub_id: "v2.2FD273C409C15EF7E16637C23820F3AB"
+      saojose_belavista:
+        cep: "88110-798"
+        sc: "1"
+        hub_id: "v2.471E6D82FC2AF1E3546612023788DC31"
+      brusque_saoluiz:
+        cep: "88350-210"
+        sc: "1"
+        hub_id: "v2.B8B2CA3F13B9BBBEF48E30DF6FB1C5C3"
+      palhoca_passavinte:
+        cep: "88132-149"
+        sc: "1"
+        hub_id: "v2.03F2FCD02C257443A10705733B2AD7ED"
+      poa_guadix:
+        cep: "91770-010"
+        sc: "1"
+        hub_id: "v2.C59E7778E80DE611066F17ABDE1DDCCE"
+      poa_nilo:
+        cep: "90470-000"
+        sc: "1"
+        hub_id: "v2.5549A69410A3F0219D7BCDA860C9D267"
+      torres_centro:
+        cep: "95560-000"
+        sc: "1"
+        hub_id: "v2.BEDC77227E6E64A871B09C032812BAA7"
+      balneario_camboriu:
+        cep: "88330-110"
+        sc: "1"
+        hub_id: "v2.D55FE45FC956CF3452F53FF1829D38B9"
+      joinville_aventureiro:
+        cep: "89226-000"
+        sc: "1"
+        hub_id: "v2.D64E8C3CDDA81BB086AFE28286D484E6"
+
+  # --------------------------------------------------------------------------
+  # FORT ATACADISTA - Discovery via sitemap (8 product sitemap files)
+  # --------------------------------------------------------------------------
+  fort:
+    platform: vtex
+    base_url: "https://www.deliveryfort.com.br"
+    cookie_domain: ".deliveryfort.com.br"
+    discovery: category_tree               # Note: sitemap exists but returns products unavailable in all sales channels
+    sitemap_pattern: "/sitemap/product-{n}.xml"
+    global_discovery: true
+    batch_size: 50
+    request_delay: 0.1                     # Optimized: 3x faster than 0.3s
+    max_workers: 7                         # Parallel regions (7 regions)
+    regions:
+      # Independent stores (no manual hub)
+      balneario_camboriu:
+        cep: "88330-110"
+        sc: "6"
+        hub_id: null
+      itajai_saojoao:
+        cep: "88304-101"
+        sc: "4"
+        hub_id: null
+      # General SC Cluster (shared inventory, distinct prices per SC)
+      blumenau_itoupava:
+        cep: "89052-050"
+        sc: "5"
+        hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
+      florianopolis_costeira:
+        cep: "88047-010"
+        sc: "2"
+        hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
+      palhoca_passavinte:
+        cep: "88132-149"
+        sc: "3"
+        hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
+      saojose_belavista:
+        cep: "88110-798"
+        sc: "3"
+        hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
+      porto_belo:
+        cep: "88210-000"
+        sc: "1"
+        hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
+
+  # --------------------------------------------------------------------------
+  # GIASSI - Discovery via sitemap (13 product sitemap files)
+  # --------------------------------------------------------------------------
+  giassi:
+    platform: vtex
+    base_url: "https://www.giassi.com.br"
+    cookie_domain: ".giassi.com.br"
+    discovery: category_tree               # Note: sitemap exists but returns products unavailable in all sales channels
+    sitemap_pattern: "/sitemap/product-{n}.xml"
+    global_discovery: true
+    batch_size: 50
+    request_delay: 0.1                     # Optimized: was 0.2s (2x faster!)
+    max_workers: 17                        # Parallel regions (17 regions)
+    regions:
+      # Stores without manual hub (automatic fallback via API)
+      florianopolis_santa_monica:
+        cep: "88035-000"
+        sc: "1"
+        hub_id: null
+      joinville_america:
+        cep: "89204-000"
+        sc: "1"
+        hub_id: null
+      blumenau_victor_konder:
+        cep: "89012-000"
+        sc: "1"
+        hub_id: null
+      palhoca_pagani:
+        cep: "88132-000"
+        sc: "1"
+        hub_id: null
+      # Manually mapped
+      florianopolis_sacogrande:
+        cep: "88032-005"
+        sc: "1"
+        hub_id: "v2.7F2A3943DBF84750AACFC84F88A37547"
+      sao_jose_areias:
+        cep: "88113-600"
+        sc: "1"
+        hub_id: "v2.ABCBB60D0ACAFE91572B611D519E9FB8"
+      joinville_bucarein:
+        cep: "89202-310"
+        sc: "1"
+        hub_id: "v2.3F129C77C9E351893874B20DA972497D"
+      jaragua_centro:
+        cep: "89251-000"
+        sc: "1"
+        hub_id: "v2.F7650946A1CE616593F5473A688636B9"
+      # Tubarao Cluster
+      tubarao_oficinas:
+        cep: "88701-000"
+        sc: "1"
+        hub_id: "v2.B38B0AA3929BDF670A0DB9B723107C2E"
+      tubarao_vila_moema:
+        cep: "88705-001"
+        sc: "1"
+        hub_id: "v2.B38B0AA3929BDF670A0DB9B723107C2E"
+      # Criciuma / Icara Cluster
+      icara_centro:
+        cep: "88820-000"
+        sc: "1"
+        hub_id: "v2.05909B625571D35E8E2AB27B22D4BE56"
+      criciuma_santa_barbara:
+        cep: "88804-000"
+        sc: "1"
+        hub_id: "v2.05909B625571D35E8E2AB27B22D4BE56"
+      criciuma_centenario:
+        cep: "88801-001"
+        sc: "1"
+        hub_id: "v2.05909B625571D35E8E2AB27B22D4BE56"
+      # Ararangua Cluster
+      ararangua_centro:
+        cep: "88900-045"
+        sc: "1"
+        hub_id: "v2.7515F347D55C9E8D142E1F03D061CB4E"
+      ararangua_cidade_alta:
+        cep: "88901-026"
+        sc: "1"
+        hub_id: "v2.7515F347D55C9E8D142E1F03D061CB4E"
+      # General South Cluster
+      morro_da_fumaca:
+        cep: "88830-000"
+        sc: "1"
+        hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
+      sombrio_centro:
+        cep: "88960-000"
+        sc: "1"
+        hub_id: "v2.1BB18CE648B5111D0933734ED83EC783"
+
+  # --------------------------------------------------------------------------
+  # CARREFOUR - HTML scraping (VTEX API blocked with 503)
+  # OPTIMIZED: Async HTTP with aiohttp (10-20x faster)
+  # --------------------------------------------------------------------------
+  carrefour:
+    platform: carrefour_html               # Use HTML scraper (API returns 503)
+    base_url: "https://mercado.carrefour.com.br"
+    cookie_domain: ".carrefour.com.br"
+    discovery: sitemap                     # Use sitemap for discovery
+    sitemap_pattern: "/sitemap/product-{n}.xml"
+    sitemap_start_index: 1                 # Carrefour sitemaps start at 1, not 0
+    global_discovery: true
+    batch_size: 50                         # Legacy sync batch size (not used in async mode)
+    request_delay: 0.1                     # Legacy delay (not used in async mode)
+    async_batch_size: 100                  # NEW: Async batch size (100 parallel requests)
+    max_concurrent_requests: 20            # NEW: Max parallel connections (20 simultaneous)
+    cache_ttl_days: 7                      # NEW: Cache 404s for 7 days, then retry (allows product restock)
+    max_workers: 1                         # No parallel scraping (HTML is slower, more respectful)
+    regions:
+      # Florianópolis - Main stores
+      florianopolis_centro:
+        cep: "88010-000"
+        sc: "1"
+        hub_id: null
+      florianopolis_trindade:
+        cep: "88036-003"
+        sc: "1"
+        hub_id: null
+      # São José
+      saojose_kobrasol:
+        cep: "88102-600"
+        sc: "1"
+        hub_id: null
+      # Palhoça
+      palhoca_pedra_branca:
+        cep: "88137-270"
+        sc: "1"
+        hub_id: null
+      # Joinville
+      joinville_centro:
+        cep: "89201-400"
+        sc: "1"
+        hub_id: null
+
+  # --------------------------------------------------------------------------
+  # ANGELONI - HTML scraping (VTEX platform with blocked API)
+  # OPTIMIZED: Async HTTP with aiohttp (10-20x faster)
+  # --------------------------------------------------------------------------
+  angeloni:
+    platform: angeloni_html
+    base_url: "https://www.angeloni.com.br"
+    cookie_domain: ".angeloni.com.br"
+    discovery: sitemap
+    sitemap_pattern: "/super/sitemap/product-{n}.xml"
+    sitemap_start_index: 0
+    global_discovery: true
+    batch_size: 50                         # Legacy sync batch size (not used in async mode)
+    request_delay: 0.1                     # Legacy delay (not used in async mode)
+    async_batch_size: 100                  # NEW: Async batch size (100 parallel requests)
+    max_concurrent_requests: 15            # NEW: Max parallel connections (15 simultaneous, lower than Carrefour)
+    max_workers: 1                         # Sequential for now
+    regions:
+      # Florianópolis - Centro
+      florianopolis_centro:
+        cep: "88010-000"
+        sc: "1"
+        hub_id: "v2.6470C9DD8410520F44B2C757ECBDE327"
+      # Florianópolis - Continente
+      florianopolis_continente:
+        cep: "88085-000"
+        sc: "1"
+        hub_id: "v2.6EA065AD64AA626F42DFCA6CBE33D035"
+      # São José - Kobrasol
+      saojose_kobrasol:
+        cep: "88102-000"
+        sc: "1"
+        hub_id: "v2.6470C9DD8410520F44B2C757ECBDE327"
+
+  # --------------------------------------------------------------------------
+  # SUPER KOCH - HTML scraping (Osuper platform with auth-required GraphQL)
+  # --------------------------------------------------------------------------
+  superkoch:
+    platform: superkoch_html
+    base_url: "https://www.superkoch.com.br"
+    cookie_domain: ".superkoch.com.br"
+    discovery: sitemap
+    sitemap_pattern: "/sitemap.xml"
+    global_discovery: true
+    batch_size: 50                # Optimized: 20 → 50 (reduced I/O overhead)
+    request_delay: 0.1            # Optimized: 0.3s → 0.1s (3x faster, same as VTEX APIs)
+    max_workers: 1                # Sequential for now
+    regions:
+      # Balneário Camboriú e Camboriú
+      balneario_camboriu:
+        store_id: "1415"
+        cep: "88340-152"
+        name: "Balneário Camboriú e Camboriú"
+
+  # --------------------------------------------------------------------------
+  # HIPPO SUPERMERCADOS - HTML scraping (Osuper platform with auth-required GraphQL)
+  # --------------------------------------------------------------------------
+  hippo:
+    platform: hippo_html
+    base_url: "https://www.hipposupermercados.com.br"
+    cookie_domain: ".hipposupermercados.com.br"
+    discovery: sitemap
+    sitemap_pattern: "/sitemap.xml"
+    global_discovery: true
+    batch_size: 50                # Optimized: HTML scraping with good performance
+    request_delay: 0.1            # Optimized: same as other HTML scrapers
+    max_workers: 1                # Sequential for now
+    regions:
+      # Florianópolis - Centro (Matriz)
+      florianopolis_centro:
+        store_id: "1384"
+        cep: "88015-420"
+        name: "Hippo Supermercados LTDA - Matriz"
