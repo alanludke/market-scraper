@@ -19,7 +19,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 # Page configuration
 st.set_page_config(
@@ -61,19 +61,27 @@ st.markdown("""
 
 # Database connection
 from utils.db_manager import get_duckdb_connection
+from utils.date_filter import render_date_filter, get_date_filter_sql
 
 @st.cache_data(ttl=300)  # Cache for 5 minutes
-def load_executive_summary():
-    """Load comprehensive executive dashboard data."""
+def load_executive_summary(start_date: date, end_date: date):
+    """
+    Load comprehensive executive dashboard data.
+
+    Args:
+        start_date: Start date for analysis
+        end_date: End date for analysis
+    """
     conn = get_duckdb_connection()
 
     data = {}
+    date_filter = get_date_filter_sql(start_date, end_date)
 
     # ========== Core Metrics ==========
     # Total products tracked
-    data['total_products'] = conn.execute("""
+    data['total_products'] = conn.execute(f"""
         SELECT COUNT(DISTINCT product_id) FROM dev_local.tru_product
-        WHERE scraped_date >= CURRENT_DATE - INTERVAL '7' DAY
+        WHERE {date_filter}
     """).fetchone()[0] or 0
 
     # Active stores
@@ -87,11 +95,11 @@ def load_executive_summary():
     """).fetchone()[0] or 0
 
     # Average price
-    result = conn.execute("""
+    result = conn.execute(f"""
         SELECT ROUND(AVG(min_price), 2)
         FROM dev_local.tru_product
         WHERE min_price > 0
-            AND scraped_date >= CURRENT_DATE - INTERVAL '7' DAY
+            AND {date_filter}
     """).fetchone()
     data['avg_price'] = result[0] if result and result[0] else 0
 
@@ -119,14 +127,14 @@ def load_executive_summary():
 
     # ========== Competitive Intelligence ==========
     # Price leader (cheapest on average)
-    price_leader = conn.execute("""
+    price_leader = conn.execute(f"""
         SELECT
             s.store_name,
             ROUND(AVG(p.min_price), 2) as avg_price
         FROM dev_local.tru_product p
         JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
         WHERE p.min_price > 0
-            AND p.scraped_date >= CURRENT_DATE - INTERVAL '7' DAY
+            AND {date_filter.replace('scraped_date', 'p.scraped_date')}
             AND s.is_active = true
         GROUP BY s.store_name
         ORDER BY avg_price ASC
@@ -150,25 +158,28 @@ def load_executive_summary():
     data['promo_leader'] = promo_leader[0] if promo_leader else "N/A"
     data['promo_leader_count'] = promo_leader[1] if promo_leader else 0
 
-    # ========== Trends (Week over Week) ==========
-    # Price trend
-    price_trend = conn.execute("""
-        WITH current_week AS (
+    # ========== Trends (Period Comparison) ==========
+    # Price trend (compare selected period vs previous period of same length)
+    period_length_days = (end_date - start_date).days + 1
+    prev_start_date = start_date - timedelta(days=period_length_days)
+    prev_end_date = start_date - timedelta(days=1)
+
+    price_trend = conn.execute(f"""
+        WITH current_period AS (
             SELECT AVG(min_price) as avg_price
             FROM dev_local.tru_product
             WHERE min_price > 0
-                AND scraped_date >= CURRENT_DATE - INTERVAL '7' DAY
+                AND {date_filter}
         ),
-        previous_week AS (
+        previous_period AS (
             SELECT AVG(min_price) as avg_price
             FROM dev_local.tru_product
             WHERE min_price > 0
-                AND scraped_date >= CURRENT_DATE - INTERVAL '14' DAY
-                AND scraped_date < CURRENT_DATE - INTERVAL '7' DAY
+                AND scraped_date BETWEEN '{prev_start_date}' AND '{prev_end_date}'
         )
         SELECT
             ROUND(((c.avg_price - p.avg_price) / NULLIF(p.avg_price, 0)) * 100, 2) as change_pct
-        FROM current_week c, previous_week p
+        FROM current_period c, previous_period p
     """).fetchone()
     data['price_trend_pct'] = price_trend[0] if price_trend and price_trend[0] else 0
 
@@ -179,8 +190,8 @@ def load_executive_summary():
     data['latest_scrape'] = latest[0] if latest and latest[0] else "N/A"
 
     # ========== Charts Data ==========
-    # Store price comparison (last 7 days)
-    data['store_comparison'] = conn.execute("""
+    # Store price comparison (selected period)
+    data['store_comparison'] = conn.execute(f"""
         SELECT
             s.store_name,
             ROUND(AVG(p.min_price), 2) as avg_price,
@@ -188,20 +199,20 @@ def load_executive_summary():
         FROM dev_local.tru_product p
         JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
         WHERE p.min_price > 0
-            AND p.scraped_date >= CURRENT_DATE - INTERVAL '7' DAY
+            AND {date_filter.replace('scraped_date', 'p.scraped_date')}
             AND s.is_active = true
         GROUP BY s.store_name
         ORDER BY avg_price ASC
     """).df()
 
-    # Daily price evolution (last 14 days)
-    data['price_evolution'] = conn.execute("""
+    # Daily price evolution (selected period)
+    data['price_evolution'] = conn.execute(f"""
         SELECT
             scraped_date,
             ROUND(AVG(min_price), 2) as avg_price
         FROM dev_local.tru_product
         WHERE min_price > 0
-            AND scraped_date >= CURRENT_DATE - INTERVAL '14' DAY
+            AND {date_filter}
         GROUP BY scraped_date
         ORDER BY scraped_date
     """).df()
@@ -229,9 +240,12 @@ def main():
     st.markdown("**Dashboard Executivo de Inteligência Competitiva**")
     st.markdown("---")
 
+    # Date filter in sidebar
+    start_date, end_date = render_date_filter()
+
     # Load data
     with st.spinner("⏳ Carregando dados executivos..."):
-        data = load_executive_summary()
+        data = load_executive_summary(start_date, end_date)
 
     # ========== Section 1: Strategic KPIs ==========
     st.subheader("📊 Indicadores Estratégicos")
