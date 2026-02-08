@@ -12,6 +12,7 @@
         - Ephemeral (does not materialize table, only CTE for downstream models)
         - No contracts (staging layer)
         - Data still contains duplicates (dedup happens in trusted layer)
+        - Uses Hive partitioning columns (supermarket, region) from bronze layer
         - Carrefour uses HTML scraping (API blocked), may have different data quality
 #}
 
@@ -23,12 +24,12 @@ with
             , brand
             , link as product_url
             , items  -- Keep nested for processing in trusted
-            , _metadata_supermarket as supermarket
-            , _metadata_region as region
-            , _metadata_postal_code as postal_code
-            , _metadata_hub_id as hub_id
-            , _metadata_run_id as run_id
-            , cast(_metadata_scraped_at as timestamp) as scraped_at
+            , supermarket  -- From Hive partitioning
+            , region  -- From Hive partitioning
+            , coalesce(_metadata_postal_code, NULL) as postal_code
+            , coalesce(_metadata_hub_id, NULL) as hub_id
+            , coalesce(_metadata_run_id, filename) as run_id
+            , coalesce(cast(_metadata_scraped_at as timestamp), scraped_at, current_timestamp) as scraped_at
         from {{ source_parquet('bronze_bistek', 'products') }}
         where productId is not null  -- Basic quality filter
     )
@@ -40,12 +41,12 @@ with
             , brand
             , link as product_url
             , items
-            , _metadata_supermarket as supermarket
-            , _metadata_region as region
-            , _metadata_postal_code as postal_code
-            , _metadata_hub_id as hub_id
-            , _metadata_run_id as run_id
-            , cast(_metadata_scraped_at as timestamp) as scraped_at
+            , supermarket  -- From Hive partitioning
+            , region  -- From Hive partitioning
+            , coalesce(_metadata_postal_code, NULL) as postal_code
+            , coalesce(_metadata_hub_id, NULL) as hub_id
+            , coalesce(_metadata_run_id, filename) as run_id
+            , coalesce(cast(_metadata_scraped_at as timestamp), scraped_at, current_timestamp) as scraped_at
         from {{ source_parquet('bronze_fort', 'products') }}
         where productId is not null
     )
@@ -57,12 +58,12 @@ with
             , brand
             , link as product_url
             , items
-            , _metadata_supermarket as supermarket
-            , _metadata_region as region
-            , _metadata_postal_code as postal_code
-            , _metadata_hub_id as hub_id
-            , _metadata_run_id as run_id
-            , cast(_metadata_scraped_at as timestamp) as scraped_at
+            , supermarket  -- From Hive partitioning
+            , region  -- From Hive partitioning
+            , coalesce(_metadata_postal_code, NULL) as postal_code
+            , coalesce(_metadata_hub_id, NULL) as hub_id
+            , coalesce(_metadata_run_id, filename) as run_id
+            , coalesce(cast(_metadata_scraped_at as timestamp), scraped_at, current_timestamp) as scraped_at
         from {{ source_parquet('bronze_giassi', 'products') }}
         where productId is not null
     )
@@ -74,12 +75,12 @@ with
             , brand
             , link as product_url
             , items
-            , _metadata_supermarket as supermarket
-            , _metadata_region as region
-            , _metadata_postal_code as postal_code
-            , _metadata_hub_id as hub_id
-            , _metadata_run_id as run_id
-            , cast(_metadata_scraped_at as timestamp) as scraped_at
+            , supermarket  -- From Hive partitioning
+            , region  -- From Hive partitioning
+            , coalesce(_metadata_postal_code, NULL) as postal_code
+            , coalesce(_metadata_hub_id, NULL) as hub_id
+            , coalesce(_metadata_run_id, filename) as run_id
+            , coalesce(cast(_metadata_scraped_at as timestamp), scraped_at, current_timestamp) as scraped_at
         from {{ source_parquet('bronze_carrefour', 'products') }}
         where productId is not null
     )
@@ -91,12 +92,12 @@ with
             , brand
             , link as product_url
             , items
-            , _metadata_supermarket as supermarket
-            , _metadata_region as region
-            , _metadata_postal_code as postal_code
-            , _metadata_hub_id as hub_id
-            , _metadata_run_id as run_id
-            , cast(_metadata_scraped_at as timestamp) as scraped_at
+            , supermarket  -- From Hive partitioning
+            , region  -- From Hive partitioning
+            , coalesce(_metadata_postal_code, NULL) as postal_code
+            , coalesce(_metadata_hub_id, NULL) as hub_id
+            , coalesce(_metadata_run_id, filename) as run_id
+            , coalesce(cast(_metadata_scraped_at as timestamp), scraped_at, current_timestamp) as scraped_at
         from {{ source_parquet('bronze_angeloni', 'products') }}
         where productId is not null
     )
