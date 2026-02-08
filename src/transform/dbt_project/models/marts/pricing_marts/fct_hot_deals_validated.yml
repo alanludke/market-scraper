@@ -1,0 +1,130 @@
+version: 2
+
+models:
+  - name: fct_hot_deals_validated
+    description: |
+      Validated hot-deals fact table with quality scoring.
+
+      Filters out suspicious/fake deals and provides quality metrics:
+      - Discount range validation (20-70%)
+      - Price consistency checks
+      - Temporal persistence tracking
+      - Quality scoring (0-100)
+      - Legitimacy classification
+
+      Only includes deals with 20%+ discount that pass basic quality checks.
+
+    meta:
+      owner: "data_team"
+      graining: "product_key + store_key + region_key + date_key"
+      contains_pii: false
+
+    columns:
+      - name: product_key
+        description: "Surrogate key for product dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_product')
+              field: product_key
+
+      - name: store_key
+        description: "Surrogate key for store dimension"
+        tests:
+          - not_null
+
+      - name: promotional_price
+        description: "Current promotional price"
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 100000
+              strictly: false
+
+      - name: regular_price
+        description: "Regular (list) price before discount"
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 100000
+              strictly: false
+
+      - name: discount_percentage
+        description: "Discount percentage (0-100)"
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 20  # Minimum hot-deal threshold
+              max_value: 100
+              strictly: false
+          - dbt_utils.expression_is_true:
+              expression: ">= 20"
+              config:
+                severity: error
+                error_if: ">100"  # Fail if >100 suspicious deals
+
+      - name: quality_score
+        description: "Quality score (0-100) based on validation rules"
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 100
+              strictly: false
+
+      - name: legitimacy_level
+        description: "Deal legitimacy classification"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['High Quality', 'Good Quality', 'Review Required', 'Suspicious']
+
+      - name: is_suspicious_discount
+        description: "Flag for suspicious discounts (>70%)"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "= (discount_percentage > 70)"
+              config:
+                severity: warn
+
+      - name: is_recommended_deal
+        description: "Flag for recommended deals (high quality, non-suspicious)"
+        tests:
+          - not_null
+
+      - name: deal_persistence_days
+        description: "Number of days deal has appeared"
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 365
+              strictly: false
+
+    tests:
+      # Ensure price consistency
+      - dbt_utils.expression_is_true:
+          expression: "regular_price > promotional_price"
+          config:
+            severity: error
+            error_if: ">50"  # Allow some errors but fail if >50 inconsistent
+
+      # Ensure quality score logic is correct
+      - dbt_utils.expression_is_true:
+          expression: |
+            (legitimacy_level = 'Suspicious' and is_suspicious_discount = true)
+            or
+            (legitimacy_level != 'Suspicious')
+          config:
+            severity: warn
+
+      # Warn if too many suspicious deals
+      - dbt_utils.fewer_rows_than:
+          compare_model: ref('fct_active_promotions')
+          group_by_columns: ['store_key', 'date_key']
+          config:
+            severity: warn
+            where: "is_suspicious_discount = true"

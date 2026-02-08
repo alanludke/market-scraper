@@ -1,0 +1,41 @@
+# Prefect deployment configuration
+name: market-scraper
+prefect-version: 3.6.16
+
+# Build configuration
+build:
+
+# Push configuration  
+push:
+
+# Pull configuration
+pull:
+  - prefect.deployments.steps.set_working_directory:
+      directory: .
+
+# Deployments
+deployments:
+  - name: daily-scraper-incremental
+    entrypoint: src/orchestration/scraper_flow.py:daily_scraper_flow
+    schedule:
+      cron: "0 2 * * *"
+      timezone: "America/Sao_Paulo"
+    parameters:
+      use_incremental: true
+      incremental_days: 7
+    tags:
+      - scraper
+      - incremental
+      - daily
+    
+  - name: monthly-scraper-full
+    entrypoint: src/orchestration/scraper_flow.py:daily_scraper_flow
+    schedule:
+      cron: "0 3 1 * *"
+      timezone: "America/Sao_Paulo"
+    parameters:
+      use_incremental: false
+    tags:
+      - scraper
+      - full
+      - monthly
