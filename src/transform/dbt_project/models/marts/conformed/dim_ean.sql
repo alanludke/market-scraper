@@ -37,7 +37,8 @@ with
     )
 
     , openfoodfacts_enrichment as (
-        -- OpenFoodFacts data (already filtered for valid EANs in staging)
+        -- OpenFoodFacts data (deduplicated - keep one row per EAN)
+        -- When multiple records exist for same EAN, pick the most recent one
         select
             ean_code
             , product_name
@@ -47,6 +48,10 @@ with
             , countries as country_of_origin
             , nutriscore_grade
         from {{ ref('stg_openfoodfacts__products') }}
+        qualify row_number() over (
+            partition by ean_code
+            order by scraped_at desc  -- Most recent scrape
+        ) = 1
     )
 
     , ean_master as (
