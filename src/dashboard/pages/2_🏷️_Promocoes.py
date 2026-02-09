@@ -108,7 +108,7 @@ def load_promo_data(start_date, end_date, stores_list, min_discount, hot_thresho
     """Load comprehensive promotion analysis data."""
 
     stores_filter = "'" + "','".join(stores_list) + "'"
-    date_filter = get_date_filter_sql(start_date, end_date)
+    date_filter = get_date_filter_sql(start_date, end_date, date_column='ap.scraped_date')
 
     data = {}
 

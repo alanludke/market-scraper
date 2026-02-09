@@ -86,7 +86,7 @@ def load_price_data(start_date, end_date, stores_list, min_price, max_price):
     """Load comprehensive price analysis data."""
 
     stores_filter = "'" + "','".join(stores_list) + "'"
-    date_filter = get_date_filter_sql(start_date, end_date)
+    date_filter = get_date_filter_sql(start_date, end_date, date_column='p.scraped_date')
 
     data = {}
 

@@ -83,7 +83,7 @@ min_stores = st.sidebar.slider(
 def load_competitive_data(start_date, end_date, min_store_count):
     """Load comprehensive competitive analysis data."""
 
-    date_filter = get_date_filter_sql(start_date, end_date)
+    date_filter = get_date_filter_sql(start_date, end_date, date_column='p.scraped_date')
 
     data = {}
 
