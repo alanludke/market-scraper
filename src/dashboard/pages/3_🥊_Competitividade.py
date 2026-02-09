@@ -11,7 +11,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 # Must be first Streamlit command
 st.set_page_config(
@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 from utils.db_manager import get_duckdb_connection
+from utils.date_filter import render_date_filter, get_date_filter_sql
 
 # Custom CSS
 st.markdown("""
@@ -61,15 +62,11 @@ st.markdown("---")
 conn = get_duckdb_connection()
 
 # ========== SIDEBAR FILTERS ==========
-st.sidebar.header("🔍 Filtros")
+# Date range filter (using shared utility)
+start_date, end_date = render_date_filter()
 
-# Time range
-time_range = st.sidebar.selectbox(
-    "Período de análise",
-    options=[7, 14, 30],
-    format_func=lambda x: f"Últimos {x} dias",
-    index=0  # Default: 7 days
-)
+st.sidebar.markdown("---")
+st.sidebar.header("🔍 Filtros Adicionais")
 
 # Minimum stores for cross-store analysis
 min_stores = st.sidebar.slider(
@@ -83,8 +80,10 @@ min_stores = st.sidebar.slider(
 # ========== DATA LOADING ==========
 
 @st.cache_data(ttl=300)
-def load_competitive_data(days, min_store_count):
+def load_competitive_data(start_date, end_date, min_store_count):
     """Load comprehensive competitive analysis data."""
+
+    date_filter = get_date_filter_sql(start_date, end_date)
 
     data = {}
 
@@ -98,7 +97,7 @@ def load_competitive_data(days, min_store_count):
                 min_price,
                 scraped_date
             FROM dev_local.tru_product
-            WHERE scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+            WHERE {date_filter}
                 AND min_price > 0
         ),
         multi_store_products AS (
@@ -131,7 +130,7 @@ def load_competitive_data(days, min_store_count):
         FROM dev_local.tru_product p
         JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
         LEFT JOIN dev_local.fct_active_promotions ap ON p.product_id = ap.product_id AND p.supermarket = CAST(ap.store_key AS VARCHAR)
-        WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+        WHERE {date_filter}
             AND p.min_price > 0
             AND s.is_active = true
         GROUP BY s.store_name
@@ -149,7 +148,7 @@ def load_competitive_data(days, min_store_count):
                 p.scraped_date
             FROM dev_local.tru_product p
             JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
-            WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+            WHERE {date_filter}
                 AND p.min_price > 0
                 AND s.is_active = true
         ),
@@ -216,7 +215,7 @@ def load_competitive_data(days, min_store_count):
                 AVG(p.min_price) as avg_price
             FROM dev_local.tru_product p
             JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
-            WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+            WHERE {date_filter}
                 AND p.min_price > 0
                 AND s.is_active = true
                 AND p.brand IS NOT NULL
@@ -250,7 +249,7 @@ def load_competitive_data(days, min_store_count):
                 ROW_NUMBER() OVER (PARTITION BY p.product_name ORDER BY p.min_price ASC) as price_rank
             FROM dev_local.tru_product p
             JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
-            WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+            WHERE {date_filter}
                 AND p.min_price > 0
                 AND s.is_active = true
         )
@@ -273,7 +272,7 @@ def load_competitive_data(days, min_store_count):
                 p.min_price
             FROM dev_local.tru_product p
             JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
-            WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+            WHERE {date_filter}
                 AND p.min_price > 0
                 AND s.is_active = true
         ),
@@ -308,7 +307,7 @@ def load_competitive_data(days, min_store_count):
                 product_name,
                 AVG(min_price) as market_avg_price
             FROM dev_local.tru_product
-            WHERE scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+            WHERE {date_filter}
                 AND min_price > 0
             GROUP BY product_name
         ),
@@ -321,7 +320,7 @@ def load_competitive_data(days, min_store_count):
             FROM dev_local.tru_product p
             JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
             JOIN market_avg ma ON p.product_name = ma.product_name
-            WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+            WHERE {date_filter}
                 AND p.min_price > 0
                 AND s.is_active = true
         )
@@ -337,7 +336,7 @@ def load_competitive_data(days, min_store_count):
 
 # Load data
 with st.spinner("⏳ Carregando análise de competitividade..."):
-    data = load_competitive_data(time_range, min_stores)
+    data = load_competitive_data(start_date, end_date, min_stores)
 
 # ========== SECTION 1: COMPETITIVE OVERVIEW ==========
 st.subheader("📊 Visão Geral Competitiva")

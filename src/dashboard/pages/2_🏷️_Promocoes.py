@@ -10,7 +10,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 # Must be first Streamlit command
 st.set_page_config(
@@ -24,6 +24,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 from utils.db_manager import get_duckdb_connection
+from utils.date_filter import render_date_filter, get_date_filter_sql
 
 # Custom CSS
 st.markdown("""
@@ -60,7 +61,11 @@ st.markdown("---")
 conn = get_duckdb_connection()
 
 # ========== SIDEBAR FILTERS ==========
-st.sidebar.header("🔍 Filtros")
+# Date range filter (using shared utility)
+start_date, end_date = render_date_filter()
+
+st.sidebar.markdown("---")
+st.sidebar.header("🔍 Filtros Adicionais")
 
 # Store filter
 stores = conn.execute("""
@@ -99,10 +104,11 @@ hot_deal_threshold = st.sidebar.number_input(
 # ========== DATA LOADING ==========
 
 @st.cache_data(ttl=300)
-def load_promo_data(stores_list, min_discount, hot_threshold):
+def load_promo_data(start_date, end_date, stores_list, min_discount, hot_threshold):
     """Load comprehensive promotion analysis data."""
 
     stores_filter = "'" + "','".join(stores_list) + "'"
+    date_filter = get_date_filter_sql(start_date, end_date)
 
     data = {}
 
@@ -115,7 +121,8 @@ def load_promo_data(stores_list, min_discount, hot_threshold):
             COUNT(DISTINCT CASE WHEN ap.discount_percentage >= {hot_threshold} THEN ap.product_id END) as hot_deals
         FROM dev_local.fct_active_promotions ap
         JOIN dev_local.dim_store ds ON ap.store_key = ds.store_key
-        WHERE ds.store_name IN ({stores_filter})
+        WHERE {date_filter}
+            AND ds.store_name IN ({stores_filter})
             AND ds.is_active = true
             AND ap.discount_percentage >= {min_discount}
     """).fetchone()
@@ -130,7 +137,8 @@ def load_promo_data(stores_list, min_discount, hot_threshold):
             COUNT(DISTINCT CASE WHEN ap.discount_percentage >= {hot_threshold} THEN ap.product_id END) as hot_deals
         FROM dev_local.fct_active_promotions ap
         JOIN dev_local.dim_store ds ON ap.store_key = ds.store_key
-        WHERE ds.store_name IN ({stores_filter})
+        WHERE {date_filter}
+            AND ds.store_name IN ({stores_filter})
             AND ds.is_active = true
             AND ap.discount_percentage >= {min_discount}
         GROUP BY ds.store_name
@@ -151,7 +159,8 @@ def load_promo_data(stores_list, min_discount, hot_threshold):
             COUNT(*) as count
         FROM dev_local.fct_active_promotions ap
         JOIN dev_local.dim_store ds ON ap.store_key = ds.store_key
-        WHERE ds.store_name IN ({stores_filter})
+        WHERE {date_filter}
+            AND ds.store_name IN ({stores_filter})
             AND ds.is_active = true
             AND ap.discount_percentage >= {min_discount}
         GROUP BY discount_range
@@ -169,7 +178,8 @@ def load_promo_data(stores_list, min_discount, hot_threshold):
             (ap.regular_price - ap.promotional_price) as savings
         FROM dev_local.fct_active_promotions ap
         JOIN dev_local.dim_store ds ON ap.store_key = ds.store_key
-        WHERE ds.store_name IN ({stores_filter})
+        WHERE {date_filter}
+            AND ds.store_name IN ({stores_filter})
             AND ds.is_active = true
             AND ap.discount_percentage >= {hot_threshold}
         ORDER BY ap.discount_percentage DESC
@@ -184,7 +194,8 @@ def load_promo_data(stores_list, min_discount, hot_threshold):
             ROUND(AVG(ap.discount_percentage), 1) as promo_depth
         FROM dev_local.fct_active_promotions ap
         JOIN dev_local.dim_store ds ON ap.store_key = ds.store_key
-        WHERE ds.store_name IN ({stores_filter})
+        WHERE {date_filter}
+            AND ds.store_name IN ({stores_filter})
             AND ds.is_active = true
             AND ap.discount_percentage >= {min_discount}
         GROUP BY ds.store_name
@@ -201,7 +212,8 @@ def load_promo_data(stores_list, min_discount, hot_threshold):
             (ap.regular_price - ap.promotional_price) as savings
         FROM dev_local.fct_active_promotions ap
         JOIN dev_local.dim_store ds ON ap.store_key = ds.store_key
-        WHERE ds.store_name IN ({stores_filter})
+        WHERE {date_filter}
+            AND ds.store_name IN ({stores_filter})
             AND ds.is_active = true
             AND ap.discount_percentage >= {min_discount}
         ORDER BY savings DESC
@@ -217,7 +229,8 @@ def load_promo_data(stores_list, min_discount, hot_threshold):
             ROUND(SUM(ap.regular_price - ap.promotional_price), 2) as total_savings
         FROM dev_local.fct_active_promotions ap
         JOIN dev_local.dim_store ds ON ap.store_key = ds.store_key
-        WHERE ds.store_name IN ({stores_filter})
+        WHERE {date_filter}
+            AND ds.store_name IN ({stores_filter})
             AND ds.is_active = true
             AND ap.discount_percentage >= {min_discount}
             AND ap.brand IS NOT NULL
@@ -234,7 +247,7 @@ if not selected_stores:
     st.stop()
 
 with st.spinner("⏳ Carregando análise de promoções..."):
-    data = load_promo_data(selected_stores, discount_threshold, hot_deal_threshold)
+    data = load_promo_data(start_date, end_date, selected_stores, discount_threshold, hot_deal_threshold)
 
 # ========== SECTION 1: KEY METRICS ==========
 st.subheader("📊 Métricas Principais")

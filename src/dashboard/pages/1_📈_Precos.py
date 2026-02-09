@@ -10,7 +10,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 # Must be first Streamlit command
 st.set_page_config(
@@ -24,6 +24,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 from utils.db_manager import get_duckdb_connection
+from utils.date_filter import render_date_filter, get_date_filter_sql
 
 # Custom CSS
 st.markdown("""
@@ -54,15 +55,11 @@ st.markdown("---")
 conn = get_duckdb_connection()
 
 # ========== SIDEBAR FILTERS ==========
-st.sidebar.header("🔍 Filtros")
+# Date range filter (using shared utility)
+start_date, end_date = render_date_filter()
 
-# Time range filter
-time_range = st.sidebar.selectbox(
-    "Período de análise",
-    options=[7, 14, 30, 60, 90],
-    format_func=lambda x: f"Últimos {x} dias",
-    index=1  # Default: 14 days
-)
+st.sidebar.markdown("---")
+st.sidebar.header("🔍 Filtros Adicionais")
 
 # Store filter
 stores = conn.execute("""
@@ -85,10 +82,11 @@ price_max = st.sidebar.number_input("Preço máximo (R$)", min_value=0.0, value=
 # ========== DATA LOADING ==========
 
 @st.cache_data(ttl=300)
-def load_price_data(days, stores_list, min_price, max_price):
+def load_price_data(start_date, end_date, stores_list, min_price, max_price):
     """Load comprehensive price analysis data."""
 
     stores_filter = "'" + "','".join(stores_list) + "'"
+    date_filter = get_date_filter_sql(start_date, end_date)
 
     data = {}
 
@@ -103,7 +101,7 @@ def load_price_data(days, stores_list, min_price, max_price):
             ROUND(STDDEV(min_price), 2) as stddev_price
         FROM dev_local.tru_product p
         JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
-        WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+        WHERE {date_filter}
             AND p.min_price BETWEEN {min_price} AND {max_price}
             AND s.store_name IN ({stores_filter})
             AND s.is_active = true
@@ -119,7 +117,7 @@ def load_price_data(days, stores_list, min_price, max_price):
             COUNT(DISTINCT product_id) as product_count
         FROM dev_local.tru_product p
         JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
-        WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+        WHERE {date_filter}
             AND p.min_price BETWEEN {min_price} AND {max_price}
             AND s.store_name IN ({stores_filter})
             AND s.is_active = true
@@ -138,7 +136,7 @@ def load_price_data(days, stores_list, min_price, max_price):
             COUNT(DISTINCT p.product_id) as product_count
         FROM dev_local.tru_product p
         JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
-        WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+        WHERE {date_filter}
             AND p.min_price BETWEEN {min_price} AND {max_price}
             AND s.store_name IN ({stores_filter})
             AND s.is_active = true
@@ -153,7 +151,7 @@ def load_price_data(days, stores_list, min_price, max_price):
             COUNT(*) as count
         FROM dev_local.tru_product p
         JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
-        WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+        WHERE {date_filter}
             AND p.min_price BETWEEN {min_price} AND {max_price}
             AND s.store_name IN ({stores_filter})
             AND s.is_active = true
@@ -170,7 +168,7 @@ def load_price_data(days, stores_list, min_price, max_price):
             p.brand
         FROM dev_local.tru_product p
         JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
-        WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+        WHERE {date_filter}
             AND p.min_price BETWEEN {min_price} AND {max_price}
             AND s.store_name IN ({stores_filter})
             AND s.is_active = true
@@ -187,7 +185,7 @@ def load_price_data(days, stores_list, min_price, max_price):
             p.brand
         FROM dev_local.tru_product p
         JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
-        WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+        WHERE {date_filter}
             AND p.min_price BETWEEN {min_price} AND {max_price}
             AND s.store_name IN ({stores_filter})
             AND s.is_active = true
@@ -205,7 +203,7 @@ def load_price_data(days, stores_list, min_price, max_price):
             ROUND((STDDEV(min_price) / NULLIF(AVG(min_price), 0)) * 100, 2) as cv_percent
         FROM dev_local.tru_product p
         JOIN dev_local.dim_store s ON CAST(p.supermarket AS VARCHAR) = s.store_id
-        WHERE p.scraped_date >= CURRENT_DATE - INTERVAL '{days}' DAY
+        WHERE {date_filter}
             AND p.min_price BETWEEN {min_price} AND {max_price}
             AND s.store_name IN ({stores_filter})
             AND s.is_active = true
@@ -223,7 +221,7 @@ if not selected_stores:
     st.stop()
 
 with st.spinner("⏳ Carregando análise de preços..."):
-    data = load_price_data(time_range, selected_stores, price_min, price_max)
+    data = load_price_data(start_date, end_date, selected_stores, price_min, price_max)
 
 # ========== SECTION 1: STATISTICS OVERVIEW ==========
 st.subheader("📊 Estatísticas Gerais")
