@@ -96,7 +96,7 @@ def load_competitive_data(start_date, end_date, min_store_count):
                 CAST(supermarket AS VARCHAR) as store_id,
                 min_price,
                 scraped_date
-            FROM dev_local.tru_product
+            FROM dev_local.tru_product p
             WHERE {date_filter}
                 AND min_price > 0
         ),
@@ -306,7 +306,7 @@ def load_competitive_data(start_date, end_date, min_store_count):
             SELECT
                 product_name,
                 AVG(min_price) as market_avg_price
-            FROM dev_local.tru_product
+            FROM dev_local.tru_product p
             WHERE {date_filter}
                 AND min_price > 0
             GROUP BY product_name
